@@ -77,7 +77,7 @@
  */
 
 (function() {
-  var $, $$, Anonymize, ArchiveLink, AutoGif, Conf, Config, DeleteLink, DownloadLink, ExpandComment, ExpandThread, Favicon, FileInfo, Filter, Get, ImageExpand, ImageHover, Keybinds, Main, Menu, Nav, Options, QR, QuoteBacklink, QuoteCT, QuoteInline, QuoteOP, QuotePreview, Quotify, Redirect, ReplyHiding, ReportLink, RevealSpoilers, Sauce, StrikethroughQuotes, ThreadHiding, ThreadStats, Time, TitlePost, UI, Unread, Updater, Watcher, d, g, _base;
+  var $, $$, Anonymize, ArchiveLink, AutoGif, Conf, Config, DeleteLink, DownloadLink, ExpandComment, ExpandThread, Favicon, FileInfo, Filter, Get, ImageExpand, ImageHover, Keybinds, Main, Menu, Nav, Options, PngFix, QR, QuoteBacklink, QuoteCT, QuoteInline, QuoteOP, QuotePreview, Quotify, Redirect, ReplyHiding, ReportLink, RevealSpoilers, Sauce, StrikethroughQuotes, ThreadHiding, ThreadStats, Time, TitlePost, UI, Unread, Updater, Watcher, d, g, _base;
 
   Config = {
     main: {
@@ -102,6 +102,7 @@
       },
       Imaging: {
         'Image Auto-Gif': [false, 'Animate gif thumbnails'],
+        'Png Thumbnail Fix': [false, 'Fixes transparent png thumbnails'],
         'Image Expansion': [true, 'Expand images'],
         'Image Hover': [false, 'Show full image on mouseover'],
         'Sauce': [true, 'Add sauce to images'],
@@ -2526,7 +2527,7 @@
         a = $.el('a', {
           href: 'javascript:;',
           className: 'settingsWindowLink',
-          textContent: '4chan X Settings'
+          textContent: '4chan X'
         });
         $.on(a, 'click', Options.dialog);
         el = $.id(settings).firstElementChild;
@@ -2889,7 +2890,7 @@
         }
         Updater.unsuccessfulFetchCount = 0;
         if (Updater.timer.textContent < -Conf['Interval']) {
-          return Updater.set('timer', -Updater.getInterval());
+          return Updater.set('timer', -Conf['Interval']);
         }
       },
       interval: function() {
@@ -2897,7 +2898,7 @@
         val = parseInt(this.value, 10);
         this.value = val > 5 ? val : 5;
         $.cb.value.call(this);
-        return Updater.set('timer', -Updater.getInterval());
+        return Updater.set('timer', -Conf['Interval']);
       },
       verbose: function() {
         if (Conf['Verbose']) {
@@ -2949,7 +2950,7 @@
           return;
         }
         Updater.unsuccessfulFetchCount++;
-        Updater.set('timer', -Updater.getInterval());
+        Updater.set('timer', -Conf['Interval']);
         /*
               Status Code 304: Not modified
               By sending the `If-Modified-Since` header we get a proper status code, and no response.
@@ -2987,7 +2988,7 @@
           return;
         }
         Updater.unsuccessfulFetchCount = 0;
-        Updater.set('timer', -Updater.getInterval());
+        Updater.set('timer', -Conf['Interval']);
         scroll = Conf['Scrolling'] && Updater.scrollBG() && lastPost.getBoundingClientRect().bottom - d.documentElement.clientHeight < 25;
         $.add(Updater.thread, nodes.reverse());
         if (scroll) {
@@ -3004,22 +3005,13 @@
         return el.textContent = text;
       }
     },
-    getInterval: function() {
-      var i, j;
-      i = +Conf['Interval'];
-      j = Math.min(this.unsuccessfulFetchCount, 9);
-      if (!(d.hidden || d.oHidden || d.mozHidden || d.webkitHidden)) {
-        j = Math.min(j, 6);
-      }
-      return Math.max(i, [5, 10, 15, 20, 30, 60, 90, 120, 240, 300][j]);
-    },
     timeout: function() {
       var n;
       Updater.timeoutID = setTimeout(Updater.timeout, 1000);
       n = 1 + Number(Updater.timer.firstChild.data);
       if (n === 0) {
         return Updater.update();
-      } else if (n >= Updater.getInterval()) {
+      } else if (n >= Conf['Interval']) {
         Updater.unsuccessfulFetchCount++;
         Updater.set('count', 'Retry');
         Updater.count.className = null;
@@ -4478,7 +4470,6 @@
       switch (board) {
         case 'a':
         case 'co':
-        case 'jp':
         case 'm':
         case 'sp':
         case 'tg':
@@ -4503,7 +4494,6 @@
       switch (board) {
         case 'a':
         case 'co':
-        case 'jp':
         case 'm':
         case 'sp':
         case 'tg':
@@ -4526,6 +4516,7 @@
           }
           break;
         case 'ck':
+        case 'jp':
         case 'lit':
           url = "//fuuka.warosu.org/" + path;
           if (threadID && postID) {
@@ -4674,6 +4665,27 @@
           return img.src = src;
         });
         return gif.src = src;
+      }
+    }
+  };
+
+  PngFix = {
+    init: function() {
+      return Main.callbacks.push(this.node);
+    },
+    node: function(post) {
+      var img, png, src;
+      img = post.img;
+      if (post.el.hidden || !img) {
+        return;
+      }
+      src = img.parentNode.href;
+      if (/png$/.test(src) && !/spoiler/.test(img.src)) {
+        png = $.el('img');
+        $.on(png, 'load', function() {
+          return img.src = src;
+        });
+        return png.src = src;
       }
     }
   };
@@ -4954,6 +4966,9 @@
       }
       if (Conf['Image Auto-Gif']) {
         AutoGif.init();
+      }
+      if (Conf['Png Thumbnail Fix']) {
+        PngFix.init();
       }
       if (Conf['Image Hover']) {
         ImageHover.init();

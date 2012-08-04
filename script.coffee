@@ -19,6 +19,7 @@ Config =
       'Show Stubs':                   [true,  'Of hidden threads / replies']
     Imaging:
       'Image Auto-Gif':               [false, 'Animate gif thumbnails']
+      'Png Thumbnail Fix':            [false, 'Fixes transparent png thumbnails']
       'Image Expansion':              [true,  'Expand images']
       'Image Hover':                  [false, 'Show full image on mouseover']
       'Sauce':                        [true,  'Add sauce to images']
@@ -1982,7 +1983,7 @@ Options =
       a = $.el 'a',
         href: 'javascript:;'
         className: 'settingsWindowLink'
-        textContent: '4chan X Settings'
+        textContent: '4chan X'
       $.on a, 'click', Options.dialog
       el = $.id(settings).firstElementChild
       el.hidden = true
@@ -2312,12 +2313,12 @@ Updater =
       # Reset the counter when we focus this tab.
       Updater.unsuccessfulFetchCount = 0
       if Updater.timer.textContent < -Conf['Interval']
-        Updater.set 'timer', -Updater.getInterval()
+        Updater.set 'timer', -Conf['Interval']
     interval: ->
       val = parseInt @value, 10
       @value = if val > 5 then val else 5
       $.cb.value.call @
-      Updater.set 'timer', -Updater.getInterval()
+      Updater.set 'timer', -Conf['Interval']
     verbose: ->
       if Conf['Verbose']
         Updater.set 'count', '+0'
@@ -2360,7 +2361,7 @@ Updater =
         return
 
       Updater.unsuccessfulFetchCount++
-      Updater.set 'timer', -Updater.getInterval()
+      Updater.set 'timer', -Conf['Interval']
 
       ###
       Status Code 304: Not modified
@@ -2394,7 +2395,7 @@ Updater =
       return unless count
 
       Updater.unsuccessfulFetchCount = 0
-      Updater.set 'timer', -Updater.getInterval()
+      Updater.set 'timer', -Conf['Interval']
       scroll = Conf['Scrolling'] && Updater.scrollBG() &&
         lastPost.getBoundingClientRect().bottom - d.documentElement.clientHeight < 25
       $.add Updater.thread, nodes.reverse()
@@ -2410,21 +2411,13 @@ Updater =
     else
       el.textContent = text
 
-  getInterval: ->
-    i = +Conf['Interval']
-    j = Math.min @unsuccessfulFetchCount, 9
-    unless d.hidden or d.oHidden or d.mozHidden or d.webkitHidden
-      # Don't increase the refresh rate too much on visible tabs.
-      j = Math.min j, 6
-    Math.max i, [5, 10, 15, 20, 30, 60, 90, 120, 240, 300][j]
-
   timeout: ->
     Updater.timeoutID = setTimeout Updater.timeout, 1000
     n = 1 + Number Updater.timer.firstChild.data
 
     if n is 0
       Updater.update()
-    else if n >= Updater.getInterval()
+    else if n >= Conf['Interval']
       Updater.unsuccessfulFetchCount++
       Updater.set 'count', 'Retry'
       Updater.count.className = null
@@ -3563,7 +3556,7 @@ Redirect =
       #   "https://md401.homelinux.net/4chan/cgi-board.pl/#{board}/full_image/#{filename}"
   post: (board, postID) ->
     switch board
-      when 'a', 'co', 'jp', 'm', 'sp', 'tg', 'tv', 'v', 'vg', 'wsg', 'dev', 'foolz'
+      when 'a', 'co', 'm', 'sp', 'tg', 'tv', 'v', 'vg', 'wsg', 'dev', 'foolz'
         "//archive.foolz.us/api/chan/post/board/#{board}/num/#{postID}/format/json"
       when 'u', 'kuku'
         "//nsfw.foolz.us/api/chan/post/board/#{board}/num/#{postID}/format/json"
@@ -3576,7 +3569,7 @@ Redirect =
       else
         "#{board}/post/#{postID}"
     switch board
-      when 'a', 'co', 'jp', 'm', 'sp', 'tg', 'tv', 'v', 'vg', 'wsg', 'dev', 'foolz'
+      when 'a', 'co', 'm', 'sp', 'tg', 'tv', 'v', 'vg', 'wsg', 'dev', 'foolz'
         url = "//archive.foolz.us/#{path}/"
         if threadID and postID
           url += "##{postID}"
@@ -3584,7 +3577,7 @@ Redirect =
         url = "//nsfw.foolz.us/#{path}/"
         if threadID and postID
           url += "##{postID}"
-      when 'ck', 'lit'
+      when 'ck', 'jp', 'lit'
         url = "//fuuka.warosu.org/#{path}"
         if threadID and postID
           url += "#p#{postID}"
@@ -3672,6 +3665,19 @@ AutoGif =
         # Replace the thumbnail once the GIF has finished loading.
         img.src = src
       gif.src = src
+
+PngFix =
+  init: ->
+    Main.callbacks.push @node
+  node: (post) ->
+    {img} = post
+    return if post.el.hidden or not img
+    src = img.parentNode.href
+    if /png$/.test(src) and !/spoiler/.test img.src
+      png = $.el 'img'
+      $.on png, 'load', ->
+        img.src = src
+      png.src = src
 
 ImageExpand =
   init: ->
@@ -3882,6 +3888,9 @@ Main =
 
     if Conf['Image Auto-Gif']
       AutoGif.init()
+
+    if Conf['Png Thumbnail Fix']
+      PngFix.init()
 
     if Conf['Image Hover']
       ImageHover.init()
