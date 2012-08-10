@@ -4720,25 +4720,13 @@
         return;
       }
       src = img.parentNode.href;
-      if (/png$/.test(src) && !/spoiler/.test(img.src && PngFix.check(img))) {
+      if (/png$/.test(src) && !/spoiler/.test(img.src)) {
         png = $.el('img');
         $.on(png, 'load', function() {
           return img.src = src;
         });
         return png.src = src;
       }
-    },
-    check: function(thumb) {
-      var ctx, data, el;
-      el = $.el('canvas', {
-        width: thumb.width,
-        height: thumb.height
-      });
-      ctx = el.getContext('2d');
-      ctx.drawImage(thumb, 0, 0);
-      data = ctx.getImageData(0, 0, thumb.width, thumb.height);
-      console.log(data);
-      return false;
     }
   };
 
@@ -4967,7 +4955,7 @@
           $.on(window, 'message', Main.message);
           $.set('lastUpdate', now);
           return $.add(d.head, $.el('script', {
-            src: 'https://github.com/MayhemYDG/4chan-x/raw/master/latest.js'
+            src: 'https://github.com/ahodesuka/4chan-x/raw/master/latest.js'
           }));
         });
       }
@@ -5184,7 +5172,7 @@
       var version;
       version = e.data.version;
       if (version && version !== Main.version && confirm('An updated version of 4chan X is available, would you like to install it now?')) {
-        return window.location = "https://raw.github.com/mayhemydg/4chan-x/" + version + "/4chan_x.user.js";
+        return window.location = "https://raw.github.com/ahodesuka/4chan-x/" + version + "/4chan_x.user.js";
       }
     },
     preParse: function(node) {
