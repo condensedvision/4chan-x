@@ -13,8 +13,8 @@
 // @include        http://sys.4chan.org/*
 // @include        https://sys.4chan.org/*
 // @run-at         document-start
-// @updateURL      https://github.com/MayhemYDG/4chan-x/raw/stable/4chan_x.user.js
-// @downloadURL    https://github.com/MayhemYDG/4chan-x/raw/stable/4chan_x.user.js
+// @updateURL      https://github.com/ahodesuka/4chan-x/raw/stable/4chan_x.user.js
+// @downloadURL    https://github.com/ahodesuka/4chan-x/raw/stable/4chan_x.user.js
 // @icon           http://mayhemydg.github.com/4chan-x/favicon.gif
 // ==/UserScript==
 
@@ -4680,13 +4680,25 @@
         return;
       }
       src = img.parentNode.href;
-      if (/png$/.test(src) && !/spoiler/.test(img.src)) {
+      if (/png$/.test(src) && !/spoiler/.test(img.src && PngFix.check(img))) {
         png = $.el('img');
         $.on(png, 'load', function() {
           return img.src = src;
         });
         return png.src = src;
       }
+    },
+    check: function(thumb) {
+      var ctx, data, el;
+      el = $.el('canvas', {
+        width: thumb.width,
+        height: thumb.height
+      });
+      ctx = el.getContext('2d');
+      ctx.drawImage(thumb, 0, 0);
+      data = ctx.getImageData(0, 0, thumb.width, thumb.height);
+      console.log(data);
+      return false;
     }
   };
 
