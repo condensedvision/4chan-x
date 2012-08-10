@@ -438,17 +438,17 @@ Filter =
         if boards isnt 'global' and boards.split(',').indexOf(g.BOARD) is -1
           continue
 
-        try
-          if key is 'md5'
-            # MD5 filter will use strings instead of regular expressions.
-            regexp = regexp[1]
-          else
+        if key is 'md5'
+          # MD5 filter will use strings instead of regular expressions.
+          regexp = regexp[1]
+        else
+          try
             # Please, don't write silly regular expressions.
             regexp = RegExp regexp[1], regexp[2]
-        catch e
-          # I warned you, bro.
-          alert e.message
-          continue
+          catch err
+            # I warned you, bro.
+            alert err.message
+            continue
 
         # Filter OPs along with their threads, replies only, or both.
         # Defaults to replies only.
@@ -532,8 +532,9 @@ Filter =
           # Put the highlighted OPs' thread on top of the board page...
           thisThread = root.parentNode
           # ...before the first non highlighted thread.
-          if firstThread = $('div[class="postContainer opContainer"]').parentNode
-            $.before firstThread, [thisThread, thisThread.nextElementSibling]
+          if firstThread = $ 'div[class="postContainer opContainer"]'
+            unless firstThread is root
+              $.before firstThread.parentNode, [thisThread, thisThread.nextElementSibling]
 
   name: (post) ->
     $('.name', post.el).textContent
@@ -2770,6 +2771,7 @@ Get =
     isOP = postID is threadID
     {name, trip, timestamp} = data
     subject = data.title
+    userID  = data.poster_hash
 
     # post info (mobile)
     piM = $.el 'div',
@@ -2806,7 +2808,7 @@ Get =
     pi = $.el 'div',
       id: "pi#{postID}"
       className: 'postInfo desktop'
-      innerHTML: "<input type=checkbox name=#{postID} value=delete> <span class=subject></span> <span class=nameBlock></span> <span class=dateTime data-utc=#{timestamp}>data.fourchan_date</span> <span class='postNum desktop'><a href='/#{board}/res/#{threadID}#p#{postID}' title='Highlight this post'>No.</a><a href='/#{board}/res/#{threadID}#q#{postID}' title='Quote this post'>#{postID}</a>#{if isOP then ' &nbsp; ' else ''}</span> "
+      innerHTML: "<input type=checkbox name=#{postID} value=delete> <span class=subject></span> <span class=nameBlock></span> <span class=dateTime data-utc=#{timestamp}>data.fourchan_date</span> <span class='postNum desktop'><a href='/#{board}/res/#{threadID}#p#{postID}' title='Highlight this post'>No.</a><a href='/#{board}/res/#{threadID}#q#{postID}' title='Quote this post'>#{postID}</a></span>"
     # subject
     $('.subject', pi).textContent = subject
     nameBlock = $ '.nameBlock', pi
@@ -2819,27 +2821,63 @@ Get =
     $.add nameBlock, $.el 'span',
       className: 'name'
       textContent: data.name
+    if userID
+      $.add nameBlock, [$.tn(' '), $.el('span',
+        className: "posteruid id_#{userID}"
+        innerHTML: "(ID: <span class=hand title='Highlight posts by this ID'>#{userID}</span>)"
+      )]
     if trip
       $.add nameBlock, [$.tn(' '), $.el('span', className: 'postertrip', textContent: trip)]
-    if capcode isnt 'N' # 'A'dmin or 'M'od
-      $.add nameBlock, [
-        $.tn(' '),
-        $.el('strong',
-          className:   if capcode is 'A' then 'capcode capcodeAdmin' else 'capcode',
-          textContent: if capcode is 'A' then '## Admin' else '## Mod'
-        )
-      ]
-      nameBlock = $ '.nameBlock', pi
-      $.addClass nameBlock, if capcode is 'A' then 'capcodeAdmin' else 'capcodeMod'
-      $.add nameBlock, [
-        $.tn(' '),
-        $.el('img',
-          src:   if capcode is 'A' then '//static.4chan.org/image/adminicon.gif' else  '//static.4chan.org/image/modicon.gif',
-          alt:   if capcode is 'A' then 'This user is the 4chan Administrator.' else 'This user is a 4chan Moderator.',
-          title: if capcode is 'A' then 'This user is the 4chan Administrator.' else 'This user is a 4chan Moderator.',
-          className: 'identityIcon'
-        )
-      ]
+    nameBlock = $ '.nameBlock', pi
+    switch capcode # 'A'dmin or 'M'od or 'D'eveloper
+      when 'A'
+        $.addClass nameBlock, 'capcodeAdmin'
+        $.add nameBlock, [
+          $.tn(' '),
+          $.el('strong',
+            className:   'capcode'
+            textContent: '## Admin'
+          ),
+          $.tn(' '),
+          $.el('img',
+            src:   '//static.4chan.org/image/adminicon.gif'
+            alt:   'This user is the 4chan Administrator.'
+            title: 'This user is the 4chan Administrator.'
+            className: 'identityIcon'
+          )
+        ]
+      when 'M'
+        $.addClass nameBlock, 'capcodeMod'
+        $.add nameBlock, [
+          $.tn(' '),
+          $.el('strong',
+            className:   'capcode'
+            textContent: '## Mod'
+          ),
+          $.tn(' '),
+          $.el('img',
+            src:   '//static.4chan.org/image/modicon.gif'
+            alt:   'This user is a 4chan Moderator.'
+            title: 'This user is a 4chan Moderator.'
+            className: 'identityIcon'
+          )
+        ]
+      when 'D'
+        $.addClass nameBlock, 'capcodeDeveloper'
+        $.add nameBlock, [
+          $.tn(' '),
+          $.el('strong',
+            className:   'capcode'
+            textContent: '## Developer'
+          ),
+          $.tn(' '),
+          $.el('img',
+            src:   '//static.4chan.org/image/developericon.gif'
+            alt:   'This user is a 4chan Developer.'
+            title: 'title="This user is a 4chan Developer.'
+            className: 'identityIcon'
+          )
+        ]
 
     # comment
     bq = $.el 'blockquote',
@@ -3543,7 +3581,7 @@ Redirect =
   image: (board, filename) ->
     # Do not use g.BOARD, the image url can originate from a cross-quote.
     switch board
-      when 'a', 'jp', 'm', 'sp', 'tg', 'vg', 'wsg'
+      when 'a', 'jp', 'm', 'q', 'sp', 'tg', 'vg', 'wsg'
         "//archive.foolz.us/#{board}/full_image/#{filename}"
       when 'u'
         "//nsfw.foolz.us/#{board}/full_image/#{filename}"
@@ -4082,7 +4120,7 @@ Main =
     $.globalEval "(#{code})()".replace '_id_', bq.id
 
   namespace: '4chan_x.'
-  version: '2.34.3'
+  version: '2.34.4'
   callbacks: []
   css: '
 /* dialog styling */
