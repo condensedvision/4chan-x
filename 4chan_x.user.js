@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.34.5
+// @version        2.34.6
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -23,7 +23,7 @@
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012 Nicolas Stepien <stepien.nicolas@gmail.com>
  * http://mayhemydg.github.com/4chan-x/
- * 4chan X 2.34.5
+ * 4chan X 2.34.6
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -485,6 +485,15 @@
       });
       $.add(d.head, script);
       return $.rm(script);
+    },
+    shortenFilename: function(filename, isOP) {
+      var threshold;
+      threshold = isOP ? 40 : 30;
+      if (filename.replace(/\.\w+$/, '').length > threshold) {
+        return "" + filename.slice(0, threshold - 5) + "(...)" + (filename.match(/\.\w+$/));
+      } else {
+        return filename;
+      }
     },
     bytesToString: function(size) {
       var unit;
@@ -3384,23 +3393,23 @@
       return Main.callbacks.push(this.node);
     },
     node: function(post) {
-      var alt, node, span;
+      var alt, filename, node, _ref;
       if (post.isInlined && !post.isCrosspost || !post.fileInfo) {
         return;
       }
       node = post.fileInfo.firstElementChild;
       alt = post.img.alt;
-      span = $('span', node);
+      filename = ((_ref = $('span', node)) != null ? _ref.title : void 0) || node.title;
       FileInfo.data = {
         link: post.img.parentNode.href,
         spoiler: /^Spoiler/.test(alt),
         size: alt.match(/\d+\.?\d*/)[0],
         unit: alt.match(/\w+$/)[0],
-        resolution: span.previousSibling.textContent.match(/\d+x\d+|PDF/)[0],
-        fullname: span.title,
-        shortname: span.textContent
+        resolution: node.textContent.match(/\d+x\d+|PDF/)[0],
+        fullname: filename,
+        shortname: $.shortenFilename(filename, post.isOP)
       };
-      node.setAttribute('data-filename', span.title);
+      node.setAttribute('data-filename', filename);
       return node.innerHTML = FileInfo.funk(FileInfo);
     },
     setFormats: function() {
@@ -3543,7 +3552,7 @@
       }
     },
     parseArchivedPost: function(req, board, postID, root, cb) {
-      var bq, br, capcode, data, email, file, filename, filesize, isOP, name, nameBlock, pc, pi, piM, span, spoiler, subject, threadID, threshold, thumb_src, timestamp, trip, userID;
+      var bq, br, capcode, data, email, file, filename, filesize, isOP, name, nameBlock, pc, pi, piM, span, spoiler, subject, threadID, thumb_src, timestamp, trip, userID;
       data = JSON.parse(req.response);
       $.addClass(root, 'archivedPost');
       if (data.error) {
@@ -3716,8 +3725,7 @@
         }));
         span = $('span[title]', file);
         span.title = filename;
-        threshold = isOP ? 40 : 30;
-        span.textContent = filename.replace(/\.\w+$/, '').length > threshold ? "" + filename.slice(0, threshold - 5) + "(...)" + (filename.match(/\.\w+$/)) : filename;
+        span.textContent = $.shortenFilename(filename, isOP);
         thumb_src = data.media_status === 'available' ? "src=" + data.thumb_link : '';
         $.add(file, $.el('a', {
           className: spoiler ? 'fileThumb imgspoiler' : 'fileThumb',
@@ -5264,7 +5272,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.34.5',
+    version: '2.34.6',
     callbacks: [],
     css: '\
 /* dialog styling */\
