@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.34.6
+// @version        2.34.7
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -23,7 +23,7 @@
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012 Nicolas Stepien <stepien.nicolas@gmail.com>
  * http://mayhemydg.github.com/4chan-x/
- * 4chan X 2.34.6
+ * 4chan X 2.34.7
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -489,7 +489,7 @@
     },
     shortenFilename: function(filename, isOP) {
       var threshold;
-      threshold = isOP ? 40 : 30;
+      threshold = 30 + 10 * isOP;
       if (filename.replace(/\.\w+$/, '').length > threshold) {
         return "" + filename.slice(0, threshold - 5) + "(...)" + (filename.match(/\.\w+$/));
       } else {
@@ -2435,7 +2435,7 @@
         mode: 'regist',
         pwd: (m = d.cookie.match(/4chan_pass=([^;]+)/)) ? decodeURIComponent(m[1]) : $('input[name=pwd]').value,
         recaptcha_challenge_field: challenge,
-        recaptcha_response_field: response + ' '
+        recaptcha_response_field: response.replace(/^\s+/, 'a ').replace(/\s+$/, ' a')
       };
       try {
         if (typeof (_base = console.log).bind === "function") {
@@ -3399,7 +3399,7 @@
         unit: alt.match(/\w+$/)[0],
         resolution: node.textContent.match(/\d+x\d+|PDF/)[0],
         fullname: filename,
-        shortname: $.shortenFilename(filename, post.isOP)
+        shortname: $.shortenFilename(filename, post.ID === post.threadID)
       };
       node.setAttribute('data-filename', filename);
       return node.innerHTML = FileInfo.funk(FileInfo);
@@ -5287,7 +5287,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.34.6',
+    version: '2.34.7',
     callbacks: [],
     css: '\
 /* dialog styling */\

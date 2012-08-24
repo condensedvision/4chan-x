@@ -370,7 +370,7 @@ $.extend $,
     # FILENAME SHORTENING SCIENCE:
     # OPs have a +10 characters threshold.
     # The file extension is not taken into account.
-    threshold = if isOP then 40 else 30
+    threshold = 30 + 10 * isOP
     if filename.replace(/\.\w+$/, '').length > threshold
       "#{filename[...threshold - 5]}(...)#{filename.match(/\.\w+$/)}"
     else
@@ -1894,7 +1894,7 @@ QR =
       mode:     'regist'
       pwd: if m = d.cookie.match(/4chan_pass=([^;]+)/) then decodeURIComponent m[1] else $('input[name=pwd]').value
       recaptcha_challenge_field: challenge
-      recaptcha_response_field:  response + ' '
+      recaptcha_response_field:  response.replace(/^\s+/, 'a ').replace /\s+$/, ' a'
 
     callbacks =
       onload: ->
@@ -2682,7 +2682,7 @@ FileInfo =
       unit:       alt.match(/\w+$/)[0]
       resolution: node.textContent.match(/\d+x\d+|PDF/)[0]
       fullname:   filename
-      shortname:  $.shortenFilename filename, post.isOP
+      shortname:  $.shortenFilename filename, post.ID is post.threadID
     # XXX GM/Scriptish
     node.setAttribute 'data-filename', filename
     node.innerHTML = FileInfo.funk FileInfo
@@ -4128,7 +4128,7 @@ Main =
     $.globalEval "(#{code})()".replace '_id_', bq.id
 
   namespace: '4chan_x.'
-  version: '2.34.6'
+  version: '2.34.7'
   callbacks: []
   css: '
 /* dialog styling */

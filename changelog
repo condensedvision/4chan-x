@@ -1,5 +1,9 @@
 master
 
+2.34.7
+- Mayhem
+  Fix one-word-captcha, you'll need to leave a space for the fake word now.
+
 2.34.6
 - Mayhem
   Fix error caused by change in 4chan's HTML about hidden filename in case of spoiler.
