@@ -77,7 +77,7 @@
  */
 
 (function() {
-  var $, $$, Anonymize, ArchiveLink, AutoGif, Conf, Config, DeleteLink, DownloadLink, ExpandComment, ExpandThread, Favicon, FileInfo, Filter, Get, ImageExpand, ImageHover, Keybinds, Main, Menu, Nav, Options, QR, QuoteBacklink, QuoteCT, QuoteInline, QuoteOP, QuotePreview, Quotify, Redirect, ReplyHiding, ReportLink, RevealSpoilers, Sauce, StrikethroughQuotes, ThreadHiding, ThreadStats, Time, TitlePost, UI, Unread, Updater, Watcher, d, g;
+  var $, $$, Anonymize, ArchiveLink, AutoGif, Conf, Config, DeleteLink, DownloadLink, ExpandComment, ExpandThread, Favicon, FileInfo, Filter, Get, ImageExpand, ImageHover, Keybinds, Main, Menu, Nav, Options, PngFix, QR, QuoteBacklink, QuoteCT, QuoteInline, QuoteOP, QuotePreview, Quotify, Redirect, ReplyHiding, ReportLink, RevealSpoilers, Sauce, StrikethroughQuotes, ThreadHiding, ThreadStats, Time, TitlePost, UI, Unread, Updater, Watcher, d, g;
 
   Config = {
     main: {
@@ -2363,7 +2363,7 @@
       }));
     },
     submit: function(e) {
-      var callbacks, captcha, captchas, challenge, err, m, opts, post, reply, response, textOnly, threadID, _base, _ref;
+      var callbacks, captcha, captchas, challenge, err, m, opts, post, reply, response, textOnly, threadID, _ref;
       if (e != null) {
         e.preventDefault();
       }
@@ -2437,13 +2437,6 @@
         recaptcha_challenge_field: challenge,
         recaptcha_response_field: response.replace(/^\s+/, 'a ').replace(/\s+$/, ' a')
       };
-      try {
-        if (typeof (_base = console.log).bind === "function") {
-          _base.bind(console);
-        }
-      } catch (err) {
-        post.com += "\n\n╔══════════════ ೋღ☃ღೋ ══════════════╗\n~ ~ ~ ~ ~ ~ ~ ~ Repost this if ~ ~ ~ ~ ~ ~ ~ ~ ~\n~ ~ ~ ~ you are a strong test build user ~ ~ ~ ~\n~ ~ ~ ~ who don’t need no stable channel ~ ~ ~ ~\n╚══════════════ ೋღ☃ღೋ ══════════════╝";
-      }
       callbacks = {
         onload: function() {
           return QR.response(this.response);
