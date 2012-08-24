@@ -255,9 +255,6 @@ $.extend $,
   MINUTE: 1000*60
   HOUR  : 1000*60*60
   DAY   : 1000*60*60*24
-  log:
-    # XXX GreaseMonkey can't into console.log.bind
-    console.log.bind? console
   engine: /WebKit|Presto|Gecko/.exec(navigator.userAgent)[0].toLowerCase()
   ready: (fc) ->
     if /interactive|complete/.test d.readyState
@@ -369,6 +366,15 @@ $.extend $,
     script = $.el 'script', textContent: code
     $.add d.head, script
     $.rm script
+  shortenFilename: (filename, isOP) ->
+    # FILENAME SHORTENING SCIENCE:
+    # OPs have a +10 characters threshold.
+    # The file extension is not taken into account.
+    threshold = if isOP then 40 else 30
+    if filename.replace(/\.\w+$/, '').length > threshold
+      "#{filename[...threshold - 5]}(...)#{filename.match(/\.\w+$/)}"
+    else
+      filename
   bytesToString: (size) ->
     unit = 0 # Bytes
     while size >= 1024
@@ -772,7 +778,7 @@ ExpandThread =
         a.textContent = a.textContent.replace '-', '+'
         #goddamit moot
         num = switch g.BOARD
-          when 'b', 'vg' then 3
+          when 'b', 'vg', 'q' then 3
           when 't' then 1
           else 5
         replies = $$ '.replyContainer', thread
@@ -1456,9 +1462,9 @@ QR =
 
   drag: (e) ->
     # Let it drag anything from the page.
-    i = if e.type is 'dragstart' then 'off' else 'on'
-    $[i] d, 'dragover', QR.dragOver
-    $[i] d, 'drop',     QR.dropFile
+    toggle = if e.type is 'dragstart' then $.off else $.on
+    toggle d, 'dragover', QR.dragOver
+    toggle d, 'drop',     QR.dropFile
   dragOver: (e) ->
     e.preventDefault()
     e.dataTransfer.dropEffect = 'copy' # cursor feedback
@@ -1825,14 +1831,21 @@ QR =
       QR.status()
       return
     QR.abort()
-    reply = QR.replies[0]
 
+    reply = QR.replies[0]
     threadID = g.THREAD_ID or $('select', QR.el).value
 
     # prevent errors
-    unless threadID is 'new' and reply.file or threadID isnt 'new' and (reply.com or reply.file)
-      err = 'No file selected.'
-    else if QR.captchaIsEnabled
+    if threadID is 'new'
+      if g.BOARD in ['vg', 'q'] and !reply.sub
+        err = 'New threads require a subject.'
+      else unless reply.file or textOnly = !!$ 'input[name=textonly]', $.id 'postForm'
+          err = 'No file selected.'
+    else
+      unless reply.com or reply.file
+        err = 'No file selected.'
+
+    if QR.captchaIsEnabled and !err
       # get oldest valid captcha
       captchas = $.get 'captchas', []
       # remove old captchas
@@ -1870,14 +1883,15 @@ QR =
     QR.status progress: '...'
 
     post =
-      resto:   threadID
-      name:    reply.name
-      email:   reply.email
-      sub:     reply.sub
-      com:     reply.com
-      upfile:  reply.file
-      spoiler: reply.spoiler
-      mode:    'regist'
+      resto:    threadID
+      name:     reply.name
+      email:    reply.email
+      sub:      reply.sub
+      com:      reply.com
+      upfile:   reply.file
+      spoiler:  reply.spoiler
+      textonly: textOnly
+      mode:     'regist'
       pwd: if m = d.cookie.match(/4chan_pass=([^;]+)/) then decodeURIComponent m[1] else $('input[name=pwd]').value
       recaptcha_challenge_field: challenge
       recaptcha_response_field:  response + ' '
@@ -1961,7 +1975,7 @@ QR =
     else
       # Enable auto-posting if we have stuff to post, disable it otherwise.
       QR.cooldown.auto = QR.replies.length > 1
-      QR.cooldown.set if /sage/i.test reply.email then 60 else 30
+      QR.cooldown.set if g.BOARD is 'q' or /sage/i.test reply.email then 60 else 30
       if Conf['Open Reply in New Tab'] && !g.REPLY && !QR.cooldown.auto
         $.open "//boards.4chan.org/#{g.BOARD}/res/#{threadID}#p#{postID}"
 
@@ -2660,17 +2674,17 @@ FileInfo =
     return if post.isInlined and not post.isCrosspost or not post.fileInfo
     node = post.fileInfo.firstElementChild
     alt  = post.img.alt
-    span = $ 'span', node
+    filename = $('span', node)?.title or node.title
     FileInfo.data =
       link:       post.img.parentNode.href
       spoiler:    /^Spoiler/.test alt
       size:       alt.match(/\d+\.?\d*/)[0]
       unit:       alt.match(/\w+$/)[0]
-      resolution: span.previousSibling.textContent.match(/\d+x\d+|PDF/)[0]
-      fullname:   span.title
-      shortname:  span.textContent
+      resolution: node.textContent.match(/\d+x\d+|PDF/)[0]
+      fullname:   filename
+      shortname:  $.shortenFilename filename, post.isOP
     # XXX GM/Scriptish
-    node.setAttribute 'data-filename', span.title
+    node.setAttribute 'data-filename', filename
     node.innerHTML = FileInfo.funk FileInfo
   setFormats: ->
     code = Conf['fileInfo'].replace /%([BKlLMnNprs])/g, (s, c) ->
@@ -2939,15 +2953,7 @@ Get =
         innerHTML: "<span id=fT#{postID} class=fileText>File: <a href='#{data.media_link or data.remote_media_link}' target=_blank>#{data.media_orig}</a>-(#{if spoiler then 'Spoiler Image, ' else ''}#{filesize}, #{data.media_w}x#{data.media_h}, <span title></span>)</span>"
       span = $ 'span[title]', file
       span.title = filename
-      threshold = if isOP then 40 else 30
-      span.textContent =
-        # FILENAME SHORTENING SCIENCE:
-        # OPs have a +10 characters threshold.
-        # The file extension is not taken into account.
-        if filename.replace(/\.\w+$/, '').length > threshold
-          "#{filename[...threshold - 5]}(...)#{filename.match(/\.\w+$/)}"
-        else
-          filename
+      span.textContent = $.shortenFilename filename, isOP
       thumb_src = if data.media_status is 'available' then "src=#{data.thumb_link}" else ''
       $.add file, $.el 'a',
         className: if spoiler then 'fileThumb imgspoiler' else 'fileThumb'
@@ -3006,6 +3012,8 @@ QuoteBacklink =
     return if post.isInlined
     quotes = {}
     for quote in post.quotes
+      # Stop at 'Admin/Mod/Dev Replies:' on /q/
+      break if quote.parentNode.getAttribute('style') is 'font-size: smaller;'
       # Don't process >>>/b/.
       if qid = quote.hash[2..]
         # Duplicate quotes get overwritten.
@@ -3446,7 +3454,7 @@ ThreadStats =
         when 'a', 'b', 'v', 'co', 'mlp'
           251
         when 'vg'
-          501
+          376
         else
           151
     Main.callbacks.push @node
@@ -3591,7 +3599,7 @@ Redirect =
       # when 'an', 'k', 'toy', 'x'
       #   "http://archive.heinessen.com/#{board}/full_image/#{filename}"
       # when 'e'
-      #   "https://md401.homelinux.net/4chan/cgi-board.pl/#{board}/full_image/#{filename}"
+      #   "https://www.cliché.net/4chan/cgi-board.pl/#{board}/full_image/#{filename}"
   post: (board, postID) ->
     switch board
       when 'a', 'co', 'm', 'q', 'sp', 'tg', 'tv', 'v', 'vg', 'wsg', 'dev', 'foolz'
@@ -3627,12 +3635,12 @@ Redirect =
         url = "//archive.rebeccablacktech.com/#{path}"
         if threadID and postID
           url += "#p#{postID}"
-      when 'an', 'fit', 'k', 'r9k', 'toy', 'x'
+      when 'an', 'fit', 'k', 'mlp', 'r9k', 'toy', 'x'
         url = "http://archive.heinessen.com/#{path}"
         if threadID and postID
           url += "#p#{postID}"
       when 'e'
-        url = "https://md401.homelinux.net/4chan/cgi-board.pl/#{path}"
+        url = "https://www.cliché.net/4chan/cgi-board.pl/#{path}"
         if threadID and postID
           url += "#p#{postID}"
       else
@@ -4120,7 +4128,7 @@ Main =
     $.globalEval "(#{code})()".replace '_id_', bq.id
 
   namespace: '4chan_x.'
-  version: '2.34.4'
+  version: '2.34.6'
   callbacks: []
   css: '
 /* dialog styling */

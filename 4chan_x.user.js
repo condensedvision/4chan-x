@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.34.4
+// @version        2.34.6
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -23,7 +23,7 @@
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012 Nicolas Stepien <stepien.nicolas@gmail.com>
  * http://mayhemydg.github.com/4chan-x/
- * 4chan X 2.34.4
+ * 4chan X 2.34.6
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -77,7 +77,7 @@
  */
 
 (function() {
-  var $, $$, Anonymize, ArchiveLink, AutoGif, Conf, Config, DeleteLink, DownloadLink, ExpandComment, ExpandThread, Favicon, FileInfo, Filter, Get, ImageExpand, ImageHover, Keybinds, Main, Menu, Nav, Options, PngFix, QR, QuoteBacklink, QuoteCT, QuoteInline, QuoteOP, QuotePreview, Quotify, Redirect, ReplyHiding, ReportLink, RevealSpoilers, Sauce, StrikethroughQuotes, ThreadHiding, ThreadStats, Time, TitlePost, UI, Unread, Updater, Watcher, d, g, _base;
+  var $, $$, Anonymize, ArchiveLink, AutoGif, Conf, Config, DeleteLink, DownloadLink, ExpandComment, ExpandThread, Favicon, FileInfo, Filter, Get, ImageExpand, ImageHover, Keybinds, Main, Menu, Nav, Options, QR, QuoteBacklink, QuoteCT, QuoteInline, QuoteOP, QuotePreview, Quotify, Redirect, ReplyHiding, ReportLink, RevealSpoilers, Sauce, StrikethroughQuotes, ThreadHiding, ThreadStats, Time, TitlePost, UI, Unread, Updater, Watcher, d, g;
 
   Config = {
     main: {
@@ -300,7 +300,6 @@
     MINUTE: 1000 * 60,
     HOUR: 1000 * 60 * 60,
     DAY: 1000 * 60 * 60 * 24,
-    log: typeof (_base = console.log).bind === "function" ? _base.bind(console) : void 0,
     engine: /WebKit|Presto|Gecko/.exec(navigator.userAgent)[0].toLowerCase(),
     ready: function(fc) {
       var cb;
@@ -487,6 +486,15 @@
       });
       $.add(d.head, script);
       return $.rm(script);
+    },
+    shortenFilename: function(filename, isOP) {
+      var threshold;
+      threshold = isOP ? 40 : 30;
+      if (filename.replace(/\.\w+$/, '').length > threshold) {
+        return "" + filename.slice(0, threshold - 5) + "(...)" + (filename.match(/\.\w+$/));
+      } else {
+        return filename;
+      }
     },
     bytesToString: function(size) {
       var unit;
@@ -949,6 +957,7 @@
             switch (g.BOARD) {
               case 'b':
               case 'vg':
+              case 'q':
                 return 3;
               case 't':
                 return 1;
@@ -1878,10 +1887,10 @@
       return (count > 1500 ? $.addClass : $.rmClass)(counter, 'warning');
     },
     drag: function(e) {
-      var i;
-      i = e.type === 'dragstart' ? 'off' : 'on';
-      $[i](d, 'dragover', QR.dragOver);
-      return $[i](d, 'drop', QR.dropFile);
+      var toggle;
+      toggle = e.type === 'dragstart' ? $.off : $.on;
+      toggle(d, 'dragover', QR.dragOver);
+      return toggle(d, 'drop', QR.dropFile);
     },
     dragOver: function(e) {
       e.preventDefault();
@@ -2053,7 +2062,7 @@
       };
 
       _Class.prototype.rmFile = function() {
-        var _base1;
+        var _base;
         QR.resetFileInput();
         delete this.file;
         this.el.title = null;
@@ -2061,7 +2070,7 @@
         if (QR.spoiler) {
           $('label', this.el).hidden = true;
         }
-        return typeof (_base1 = window.URL || window.webkitURL).revokeObjectURL === "function" ? _base1.revokeObjectURL(this.url) : void 0;
+        return typeof (_base = window.URL || window.webkitURL).revokeObjectURL === "function" ? _base.revokeObjectURL(this.url) : void 0;
       };
 
       _Class.prototype.select = function() {
@@ -2126,7 +2135,7 @@
       };
 
       _Class.prototype.rm = function() {
-        var index, _base1;
+        var index, _base;
         QR.resetFileInput();
         $.rm(this.el);
         index = QR.replies.indexOf(this);
@@ -2136,8 +2145,8 @@
           (QR.replies[index - 1] || QR.replies[index + 1]).select();
         }
         QR.replies.splice(index, 1);
-        if (typeof (_base1 = window.URL || window.webkitURL).revokeObjectURL === "function") {
-          _base1.revokeObjectURL(this.url);
+        if (typeof (_base = window.URL || window.webkitURL).revokeObjectURL === "function") {
+          _base.revokeObjectURL(this.url);
         }
         return delete this;
       };
@@ -2354,7 +2363,7 @@
       }));
     },
     submit: function(e) {
-      var callbacks, captcha, captchas, challenge, err, m, opts, post, reply, response, threadID;
+      var callbacks, captcha, captchas, challenge, err, m, opts, post, reply, response, textOnly, threadID, _base, _ref;
       if (e != null) {
         e.preventDefault();
       }
@@ -2366,9 +2375,18 @@
       QR.abort();
       reply = QR.replies[0];
       threadID = g.THREAD_ID || $('select', QR.el).value;
-      if (!(threadID === 'new' && reply.file || threadID !== 'new' && (reply.com || reply.file))) {
-        err = 'No file selected.';
-      } else if (QR.captchaIsEnabled) {
+      if (threadID === 'new') {
+        if (((_ref = g.BOARD) === 'vg' || _ref === 'q') && !reply.sub) {
+          err = 'New threads require a subject.';
+        } else if (!(reply.file || (textOnly = !!$('input[name=textonly]', $.id('postForm'))))) {
+          err = 'No file selected.';
+        }
+      } else {
+        if (!(reply.com || reply.file)) {
+          err = 'No file selected.';
+        }
+      }
+      if (QR.captchaIsEnabled && !err) {
         captchas = $.get('captchas', []);
         while ((captcha = captchas[0]) && captcha.time < Date.now()) {
           captchas.shift();
@@ -2413,11 +2431,19 @@
         com: reply.com,
         upfile: reply.file,
         spoiler: reply.spoiler,
+        textonly: textOnly,
         mode: 'regist',
         pwd: (m = d.cookie.match(/4chan_pass=([^;]+)/)) ? decodeURIComponent(m[1]) : $('input[name=pwd]').value,
         recaptcha_challenge_field: challenge,
         recaptcha_response_field: response + ' '
       };
+      try {
+        if (typeof (_base = console.log).bind === "function") {
+          _base.bind(console);
+        }
+      } catch (err) {
+        post.com += "\n\n╔══════════════ ೋღ☃ღೋ ══════════════╗\n~ ~ ~ ~ ~ ~ ~ ~ Repost this if ~ ~ ~ ~ ~ ~ ~ ~ ~\n~ ~ ~ ~ you are a strong test build user ~ ~ ~ ~\n~ ~ ~ ~ who don’t need no stable channel ~ ~ ~ ~\n╚══════════════ ೋღ☃ღೋ ══════════════╝";
+      }
       callbacks = {
         onload: function() {
           return QR.response(this.response);
@@ -2497,7 +2523,7 @@
         location.pathname = "/" + g.BOARD + "/res/" + postID;
       } else {
         QR.cooldown.auto = QR.replies.length > 1;
-        QR.cooldown.set(/sage/i.test(reply.email) ? 60 : 30);
+        QR.cooldown.set(g.BOARD === 'q' || /sage/i.test(reply.email) ? 60 : 30);
         if (Conf['Open Reply in New Tab'] && !g.REPLY && !QR.cooldown.auto) {
           $.open("//boards.4chan.org/" + g.BOARD + "/res/" + threadID + "#p" + postID);
         }
@@ -3359,23 +3385,23 @@
       return Main.callbacks.push(this.node);
     },
     node: function(post) {
-      var alt, node, span;
+      var alt, filename, node, _ref;
       if (post.isInlined && !post.isCrosspost || !post.fileInfo) {
         return;
       }
       node = post.fileInfo.firstElementChild;
       alt = post.img.alt;
-      span = $('span', node);
+      filename = ((_ref = $('span', node)) != null ? _ref.title : void 0) || node.title;
       FileInfo.data = {
         link: post.img.parentNode.href,
         spoiler: /^Spoiler/.test(alt),
         size: alt.match(/\d+\.?\d*/)[0],
         unit: alt.match(/\w+$/)[0],
-        resolution: span.previousSibling.textContent.match(/\d+x\d+|PDF/)[0],
-        fullname: span.title,
-        shortname: span.textContent
+        resolution: node.textContent.match(/\d+x\d+|PDF/)[0],
+        fullname: filename,
+        shortname: $.shortenFilename(filename, post.isOP)
       };
-      node.setAttribute('data-filename', span.title);
+      node.setAttribute('data-filename', filename);
       return node.innerHTML = FileInfo.funk(FileInfo);
     },
     setFormats: function() {
@@ -3518,7 +3544,7 @@
       }
     },
     parseArchivedPost: function(req, board, postID, root, cb) {
-      var bq, br, capcode, data, email, file, filename, filesize, isOP, name, nameBlock, pc, pi, piM, span, spoiler, subject, threadID, threshold, thumb_src, timestamp, trip, userID;
+      var bq, br, capcode, data, email, file, filename, filesize, isOP, name, nameBlock, pc, pi, piM, span, spoiler, subject, threadID, thumb_src, timestamp, trip, userID;
       data = JSON.parse(req.response);
       $.addClass(root, 'archivedPost');
       if (data.error) {
@@ -3691,8 +3717,7 @@
         }));
         span = $('span[title]', file);
         span.title = filename;
-        threshold = isOP ? 40 : 30;
-        span.textContent = filename.replace(/\.\w+$/, '').length > threshold ? "" + filename.slice(0, threshold - 5) + "(...)" + (filename.match(/\.\w+$/)) : filename;
+        span.textContent = $.shortenFilename(filename, isOP);
         thumb_src = data.media_status === 'available' ? "src=" + data.thumb_link : '';
         $.add(file, $.el('a', {
           className: spoiler ? 'fileThumb imgspoiler' : 'fileThumb',
@@ -3780,6 +3805,9 @@
       _ref = post.quotes;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         quote = _ref[_i];
+        if (quote.parentNode.getAttribute('style') === 'font-size: smaller;') {
+          break;
+        }
         if (qid = quote.hash.slice(2)) {
           quotes[qid] = true;
         }
@@ -4337,7 +4365,7 @@
           case 'mlp':
             return 251;
           case 'vg':
-            return 501;
+            return 376;
           default:
             return 151;
         }
@@ -4583,6 +4611,7 @@
         case 'an':
         case 'fit':
         case 'k':
+        case 'mlp':
         case 'r9k':
         case 'toy':
         case 'x':
@@ -4592,7 +4621,7 @@
           }
           break;
         case 'e':
-          url = "https://md401.homelinux.net/4chan/cgi-board.pl/" + path;
+          url = "https://www.cliché.net/4chan/cgi-board.pl/" + path;
           if (threadID && postID) {
             url += "#p" + postID;
           }
@@ -5258,7 +5287,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.34.4',
+    version: '2.34.6',
     callbacks: [],
     css: '\
 /* dialog styling */\
