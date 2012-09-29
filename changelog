@@ -1,5 +1,49 @@
 master
 
+2.35.4
+- Mayhem
+  Removed the obnoxious 4chan Pass ad in captcha errors when posting.
+  Fix 'Administrator/Moderator/Developer Replies' creating extra backlinks on /q/, again.
+
+2.35.3
+- Mayhem
+  Larger Comment text input by default for 4chan Pass users and on /f/ (no captcha).
+
+2.35.2
+- Mayhem
+  Fix 4chan Pass with QR on Firefox.
+
+2.35.1
+- Mayhem
+  Add support for 4chan Pass.
+  You can now use 'Enter' in keybind combinations.
+
+2.35.0
+- Mayhem
+  Use 4chan's API to fetch posts for:
+    - Thread Updater.
+    - Quote Inlining.
+    - Quote Previewing.
+    - Thread Expansion.
+    - Comment Expansion.
+    This will make fetching faster, and reduce bandwidth usage.
+  Add an option to disable 4chan's inline extension. Enabled by default.
+  Fix compatibility with Scriptish's auto-udpater.
+
+2.34.10
+- Mayhem
+  Fix 4chan X. Blame moot.
+
+2.34.9
+- Mayhem
+  Add /g/, /k/, /w/, /an/, /cgl/, /ck/, /lit/, /toy/ and /x/ archived image redirection.
+  One-word-captcha now works in the report window.
+  Fix duplicate file upload error link.
+
+2.34.8
+- Mayhem
+  One-word-captcha: you don't need to input an extra space anymore, the true word will be duplicated.
+
 2.34.7
 - Mayhem
   Fix one-word-captcha, you'll need to leave a space for the fake word now.
