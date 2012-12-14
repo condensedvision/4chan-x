@@ -4826,42 +4826,26 @@
         case 'wsg':
         case 'dev':
         case 'foolz':
-          url = "//archive.foolz.us/" + path + "/";
-          if (threadID && postID) {
-            url += "#" + postID;
-          }
+          url = Redirect.path('//archive.foolz.us', 'foolfuuka', data);
           break;
         case 'u':
         case 'kuku':
-          url = "//nsfw.foolz.us/" + path + "/";
-          if (threadID && postID) {
-            url += "#" + postID;
-          }
+          url = Redirect.path('//nsfw.foolz.us', 'foolfuuka', data);
           break;
         case 'ck':
         case 'jp':
         case 'lit':
-          url = "//fuuka.warosu.org/" + path;
-          if (threadID && postID) {
-            url += "#p" + postID;
-          }
+          url = Redirect.path('//fuuka.warosu.org', 'fuuka', data);
           break;
         case 'diy':
-        case 'g':
         case 'sci':
-          url = "//archive.installgentoo.net/" + path;
-          if (threadID && postID) {
-            url += "#p" + postID;
-          }
+          url = Redirect.path('//archive.installgentoo.net', 'fuuka', data);
           break;
         case 'cgl':
+        case 'g':
         case 'mu':
-        case 'soc':
         case 'w':
-          url = "//archive.rebeccablacktech.com/" + path;
-          if (threadID && postID) {
-            url += "#p" + postID;
-          }
+          url = Redirect.path('//rbt.asia', 'fuuka', data);
           break;
         case 'an':
         case 'fit':

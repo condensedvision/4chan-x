@@ -3929,25 +3929,15 @@ Redirect =
     {board} = data
     switch board
       when 'a', 'co', 'm', 'q', 'sp', 'tg', 'tv', 'v', 'vg', 'wsg', 'dev', 'foolz'
-        url = "//archive.foolz.us/#{path}/"
-        if threadID and postID
-          url += "##{postID}"
+        url = Redirect.path '//archive.foolz.us', 'foolfuuka', data
       when 'u', 'kuku'
-        url = "//nsfw.foolz.us/#{path}/"
-        if threadID and postID
-          url += "##{postID}"
+        url = Redirect.path '//nsfw.foolz.us', 'foolfuuka', data
       when 'ck', 'jp', 'lit'
-        url = "//fuuka.warosu.org/#{path}"
-        if threadID and postID
-          url += "#p#{postID}"
-      when 'diy', 'g', 'sci'
-        url = "//archive.installgentoo.net/#{path}"
-        if threadID and postID
-          url += "#p#{postID}"
-      when 'cgl', 'mu', 'soc', 'w'
-        url = "//archive.rebeccablacktech.com/#{path}"
-        if threadID and postID
-          url += "#p#{postID}"
+        url = Redirect.path '//fuuka.warosu.org', 'fuuka', data
+      when 'diy', 'sci'
+        url = Redirect.path '//archive.installgentoo.net', 'fuuka', data
+      when 'cgl', 'g', 'mu', 'w'
+        url = Redirect.path '//rbt.asia', 'fuuka', data
       when 'an', 'fit', 'k', 'mlp', 'r9k', 'toy', 'x'
         url = Redirect.path 'http://archive.heinessen.com', 'fuuka', data
       when 'c'
