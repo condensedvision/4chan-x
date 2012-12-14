@@ -952,7 +952,7 @@ ReplyHiding =
       innerHTML: '<a href="javascript:;"><span>[ + ]</span> </a>'
     a = stub.firstChild
     $.on  a, 'click', ReplyHiding.toggle
-    $.add a, $.tn $('.desktop > .nameBlock', el).textContent
+    $.add a, $.tn if Conf['Anonymize'] then 'Anonymous' else $('.desktop > .nameBlock', el).textContent
     if Conf['Menu']
       menuButton = Menu.a.cloneNode true
       $.on menuButton, 'click', Menu.toggle
@@ -1550,10 +1550,9 @@ QR =
     id   = @previousSibling.hash[2..]
     text = ">>#{id}\n"
 
-    sel = window.getSelection()
+    sel = d.getSelection()
     if (s = sel.toString().trim()) and id is $.x('ancestor-or-self::blockquote', sel.anchorNode)?.id.match(/\d+$/)[0]
-      # XXX Opera needs d.getSelection() to retain linebreaks from the selected text
-      s = d.getSelection().trim() if $.engine is 'presto'
+      # XXX Opera doesn't retain `\n`s?
       s = s.replace /\n/g, '\n>'
       text += ">#{s}\n"
 
@@ -1561,12 +1560,10 @@ QR =
     caretPos = ta.selectionStart
     # Replace selection for text.
     ta.value = ta.value[...caretPos] + text + ta.value[ta.selectionEnd..]
-    ta.focus()
     # Move the caret to the end of the new quote.
     range = caretPos + text.length
-    # XXX Opera counts newlines as double
-    range += text.match(/\n/g).length if $.engine is 'presto'
     ta.setSelectionRange range, range
+    ta.focus()
 
     # Fire the 'input' event
     $.event ta, new Event 'input'
@@ -1841,7 +1838,7 @@ QR =
       @input.alt = count # For XTRM RICE.
     reload: (focus) ->
       # the "t" argument prevents the input from being focused
-      window.location = 'javascript:Recaptcha.reload("t")'
+      $.globalEval 'javascript:Recaptcha.reload("t")'
       # Focus if we meant to.
       QR.captcha.input.focus() if focus
     keydown: (e) ->
