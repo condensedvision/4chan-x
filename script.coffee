@@ -2,6 +2,7 @@ Config =
   main:
     Enhancing:
       'Disable 4chan\'s extension':   [true,  'Avoid conflicts between 4chan X and 4chan\'s inline extension.']
+      'Catalog Links':                [true,  'Turn Navigation links into links to each board\'s catalog.']
       '404 Redirect':                 [true,  'Redirect dead threads and images']
       'Keybinds':                     [true,  'Binds actions to keys']
       'Time Formatting':              [true,  'Arbitrarily formatted timestamps, using your local time']
@@ -267,8 +268,9 @@ $.extend $,
       fc()
     $.on d, 'DOMContentLoaded', cb
   sync: (key, cb) ->
+    key = Main.namespace + key
     $.on window, 'storage', (e) ->
-      cb JSON.parse e.newValue if e.key is "#{Main.namespace}#{key}"
+      cb JSON.parse e.newValue if e.key is key
   id: (id) ->
     d.getElementById id
   formData: (arg) ->
@@ -702,11 +704,11 @@ StrikethroughQuotes =
   node: (post) ->
     return if post.isInlined
     for quote in post.quotes
-      if (el = $.id quote.hash[1..]) and el.hidden
-        $.addClass quote, 'filtered'
-        if Conf['Recursive Filtering'] and post.ID isnt post.threadID
-          show_stub = !!$.x 'preceding-sibling::div[contains(@class,"stub")]', el
-          ReplyHiding.hide post.root, show_stub
+      continue unless (el = $.id quote.hash[1..]) and !/catalog$/.test(quote.pathname) and el.hidden
+      $.addClass quote, 'filtered'
+      if Conf['Recursive Filtering'] and post.ID isnt post.threadID
+        show_stub = !!$.x 'preceding-sibling::div[contains(@class,"stub")]', el
+        ReplyHiding.hide post.root, show_stub
     return
 
 ExpandComment =
@@ -830,7 +832,8 @@ ExpandThread =
 
 ThreadHiding =
   init: ->
-    hiddenThreads = $.get "hiddenThreads/#{g.BOARD}/", {}
+    hiddenThreads = ThreadHiding.sync()
+    return if g.CATALOG
     for thread in $$ '.thread'
       a = $.el 'a',
         className: 'hide_thread_button'
@@ -842,6 +845,20 @@ ThreadHiding =
       if thread.id[1..] of hiddenThreads
         ThreadHiding.hide thread
     return
+
+  sync: ->
+    hiddenThreads = $.get "hiddenThreads/#{g.BOARD}/", {}
+    hiddenThreadsCatalog = JSON.parse localStorage.getItem "4chan-hide-t-#{g.BOARD}"
+    if g.CATALOG
+      for id of hiddenThreads
+        hiddenThreadsCatalog[id] = true
+      localStorage.setItem "4chan-hide-t-#{g.BOARD}", JSON.stringify hiddenThreadsCatalog
+    else
+      for id of hiddenThreadsCatalog
+        unless id of hiddenThreads
+          hiddenThreads[id] = Date.now()
+      $.set "hiddenThreads/#{g.BOARD}/", hiddenThreads
+    hiddenThreads
 
   cb: ->
     ThreadHiding.toggle $.x 'ancestor::div[parent::div[@class="board"]]', @
@@ -1149,11 +1166,11 @@ Keybinds =
       when Conf.zero
         window.location = "/#{g.BOARD}/0#delform"
       when Conf.nextPage
-        if link = $ 'link[rel=next]', d.head
-          window.location = link.href
+        if form = $ '.next form'
+          window.location = form.action
       when Conf.previousPage
-        if link = $ 'link[rel=prev]', d.head
-          window.location.href = link.href
+        if form = $ '.prev form'
+          window.location = form.action
       # Thread Navigation
       when Conf.nextThread
         return if g.REPLY
@@ -1340,7 +1357,12 @@ QR =
       link = $.el 'h1', innerHTML: "<a href=javascript:;>#{if g.REPLY then 'Reply to Thread' else 'Start a Thread'}</a>"
       $.on link.firstChild, 'click', ->
         QR.open()
-        $('select',   QR.el).value = 'new' unless g.REPLY
+        unless g.REPLY
+          QR.threadSelector.value =
+            if g.BOARD is 'f'
+              '9999'
+            else
+              'new'
         $('textarea', QR.el).focus()
       $.before $.id('postForm'), link
 
@@ -1404,7 +1426,7 @@ QR =
       value    = 404
       disabled = true
       QR.cooldown.auto = false
-    value = QR.cooldown.seconds or data.progress or value
+    value = data.progress or QR.cooldown.seconds or value
     {input} = QR.status
     input.value =
       if QR.cooldown.auto and Conf['Cooldown']
@@ -1416,32 +1438,114 @@ QR =
   cooldown:
     init: ->
       return unless Conf['Cooldown']
-      {timeout, length} = $.get "/#{g.BOARD}/cooldown", {}
-      QR.cooldown.start timeout, length if timeout
-      $.sync "/#{g.BOARD}/cooldown", QR.cooldown.start
-    start: (timeout, length) ->
-      seconds = Math.floor (timeout - Date.now()) / 1000
-      QR.cooldown.count seconds, length
-    set: (seconds) ->
+      QR.cooldown.types =
+        thread: switch g.BOARD
+          when 'q' then 86400
+          when 'b', 'soc', 'r9k' then 600
+          else 300
+        sage: if g.BOARD is 'q' then 600 else 60
+        file: if g.BOARD is 'q' then 300 else 30
+        post: if g.BOARD is 'q' then 60  else 30
+      QR.cooldown.cooldowns = $.get "#{g.BOARD}.cooldown", {}
+      QR.cooldown.start()
+      $.sync "#{g.BOARD}.cooldown", QR.cooldown.sync
+    start: ->
+      return if QR.cooldown.isCounting
+      QR.cooldown.isCounting = true
+      QR.cooldown.count()
+    sync: (cooldowns) ->
+      # Add each cooldowns, don't overwrite everything in case we
+      # still need to purge one in the current tab to auto-post.
+      for id of cooldowns
+        QR.cooldown.cooldowns[id] = cooldowns[id]
+      QR.cooldown.start()
+    set: (data) ->
       return unless Conf['Cooldown']
-      QR.cooldown.count seconds, seconds
-      $.set "/#{g.BOARD}/cooldown",
-        timeout: Date.now() + seconds * $.SECOND
-        length:  seconds
-    count: (seconds, length) ->
-      return unless 0 <= seconds <= length
-      setTimeout QR.cooldown.count, 1000, seconds-1, length
+      start = Date.now()
+      if data.delay
+        cooldown = delay: data.delay
+      else
+        isSage  = /sage/i.test data.post.email
+        hasFile = !!data.post.file
+        isReply = data.isReply
+        type =
+          unless isReply
+            'thread'
+          else if isSage
+            'sage'
+          else if hasFile
+            'file'
+          else
+            'post'
+        cooldown =
+          isReply: isReply
+          isSage:  isSage
+          hasFile: hasFile
+          timeout: start + QR.cooldown.types[type] * $.SECOND
+      QR.cooldown.cooldowns[start] = cooldown
+      $.set "#{g.BOARD}.cooldown", QR.cooldown.cooldowns
+      QR.cooldown.start()
+    unset: (id) ->
+      delete QR.cooldown.cooldowns[id]
+      $.set "#{g.BOARD}.cooldown", QR.cooldown.cooldowns
+    count: ->
+      if Object.keys(QR.cooldown.cooldowns).length
+        setTimeout QR.cooldown.count, 1000
+      else
+        $.delete "#{g.BOARD}.cooldown"
+        delete QR.cooldown.isCounting
+        delete QR.cooldown.seconds
+        QR.status()
+        return
+
+      if (isReply = if g.REPLY then true else QR.threadSelector.value isnt 'new')
+        post    = QR.replies[0]
+        isSage  = /sage/i.test post.email
+        hasFile = !!post.file
+      now     = Date.now()
+      seconds = null
+      {types, cooldowns} = QR.cooldown
+
+      for start, cooldown of cooldowns
+        if 'delay' of cooldown
+          if cooldown.delay
+            seconds = Math.max seconds, cooldown.delay--
+          else
+            seconds = Math.max seconds, 0
+            QR.cooldown.unset start
+          continue
+
+        if isReply is cooldown.isReply
+          # Only cooldowns relevant to this post can set the seconds value.
+          # Unset outdated cooldowns that can no longer impact us.
+          type =
+            unless isReply
+              'thread'
+            else if isSage and cooldown.isSage
+              'sage'
+            else if hasFile and cooldown.hasFile
+              'file'
+            else
+              'post'
+          elapsed = Math.floor (now - start) / 1000
+          if elapsed >= 0 # clock changed since then?
+            seconds = Math.max seconds, types[type] - elapsed
+        unless start <= now <= cooldown.timeout
+          QR.cooldown.unset start
+
+      # Update the status when we change posting type.
+      # Don't get stuck at some random number.
+      # Don't interfere with progress status updates.
+      update = seconds isnt null or !!QR.cooldown.seconds
       QR.cooldown.seconds = seconds
-      if seconds is 0
-        $.delete "/#{g.BOARD}/cooldown"
-        QR.submit() if QR.cooldown.auto
-      QR.status()
+      QR.status() if update
+      QR.submit() if seconds is 0 and QR.cooldown.auto
 
   quote: (e) ->
     e?.preventDefault()
     QR.open()
     unless g.REPLY
-      $('select', QR.el).value = $.x('ancestor::div[parent::div[@class="board"]]', @).id[1..]
+      QR.threadSelector.value = $.x('ancestor::div[parent::div[@class="board"]]', @).id[1..]
     # Make sure we get the correct number, even with XXX censors
     id   = @previousSibling.hash[2..]
     text = ">>#{id}\n"
@@ -1672,7 +1776,6 @@ QR =
         (QR.replies[index-1] or QR.replies[index+1]).select()
       QR.replies.splice index, 1
       (window.URL or window.webkitURL).revokeObjectURL? @url
-      delete @
 
   captcha:
     init: ->
@@ -1802,10 +1905,15 @@ QR =
       for thread in $$ '.thread'
         id = thread.id[1..]
         threads += "<option value=#{id}>Thread #{id}</option>"
-      $.prepend $('.move > span', QR.el), $.el 'select'
-        innerHTML: threads
-        title: 'Create a new thread / Reply to a thread'
-      $.on $('select',  QR.el), 'mousedown', (e) -> e.stopPropagation()
+      QR.threadSelector =
+        if g.BOARD is 'f'
+          $('select[name=filetag]').cloneNode true
+        else
+          $.el 'select'
+            innerHTML: threads
+            title: 'Create a new thread / Reply to a thread'
+      $.prepend $('.move > span', QR.el), QR.threadSelector
+      $.on QR.threadSelector,   'mousedown', (e) -> e.stopPropagation()
     $.on $('#autohide', QR.el), 'change',    QR.toggleHide
     $.on $('.close',    QR.el), 'click',     QR.close
     $.on $('#dump',     QR.el), 'click',     -> QR.el.classList.toggle 'dump'
@@ -1826,7 +1934,7 @@ QR =
         QR.selected[@name] = @value
         # Disable auto-posting if you're typing in the first reply
         # during the last 5 seconds of the cooldown.
-        if QR.cooldown.auto and QR.selected is QR.replies[0] and 0 < QR.cooldown.seconds < 6
+        if QR.cooldown.auto and QR.selected is QR.replies[0] and 0 < QR.cooldown.seconds <= 5
           QR.cooldown.auto = false
 
     QR.status.input = $ 'input[type=submit]', QR.el
@@ -1849,16 +1957,22 @@ QR =
     QR.abort()
 
     reply = QR.replies[0]
-    threadID = g.THREAD_ID or $('select', QR.el).value
+    if g.BOARD is 'f' and not g.REPLY
+      filetag  = QR.threadSelector.value
+      threadID = 'new'
+    else
+      threadID = g.THREAD_ID or QR.threadSelector.value
 
     # prevent errors
     if threadID is 'new'
+      threadID = null
       if g.BOARD in ['vg', 'q'] and !reply.sub
         err = 'New threads require a subject.'
       else unless reply.file or textOnly = !!$ 'input[name=textonly]', $.id 'postForm'
-          err = 'No file selected.'
-    else
-      unless reply.com or reply.file
+        err = 'No file selected.'
+      else if g.BOARD is 'f' and filetag is '9999'
+        err = 'Invalid tag specified.'
+    else unless reply.com or reply.file
         err = 'No file selected.'
 
     if QR.captchaIsEnabled and !err
@@ -1910,6 +2024,7 @@ QR =
       sub:      reply.sub
       com:      reply.com
       upfile:   reply.file
+      filetag:  filetag
       spoiler:  reply.spoiler
       textonly: textOnly
       mode:     'regist'
@@ -1970,7 +2085,7 @@ QR =
             true
         # Too many frequent mistyped captchas will auto-ban you!
         # On connection error, the post most likely didn't go through.
-        QR.cooldown.set 2
+        QR.cooldown.set delay: 2
       else # stop auto-posting
         QR.cooldown.auto = false
       QR.status()
@@ -1995,29 +2110,16 @@ QR =
         threadID: threadID
         postID:   postID
 
+    QR.cooldown.set
+      post:    reply
+      isReply: threadID isnt '0'
+
     if threadID is '0' # new thread
       # auto-noko
       location.pathname = "/#{g.BOARD}/res/#{postID}"
     else
       # Enable auto-posting if we have stuff to post, disable it otherwise.
       QR.cooldown.auto = QR.replies.length > 1
-      sage    = /sage/i.test reply.email
-      seconds =
-        # 300 seconds cooldown for new threads
-        # q: 86400 seconds
-        # b soc r9k: 600 seconds
-        if g.BOARD is 'q'
-          if sage
-            600
-          else if reply.file
-            300
-          else
-            60
-        else if sage
-          60
-        else
-          30
-      QR.cooldown.set seconds
       if Conf['Open Reply in New Tab'] and !g.REPLY and !QR.cooldown.auto
         $.open "//boards.4chan.org/#{g.BOARD}/res/#{threadID}#p#{postID}"
 
@@ -2044,7 +2146,11 @@ Options =
         className: 'settingsWindowLink'
         textContent: '4chan X'
       $.on a, 'click', Options.dialog
-      $.prepend $.id(settings), [$.tn('['), a, $.tn('] ')]
+      setting = $.id settings
+      if Conf['Disable 4chan\'s extension']
+        $.replace setting.childNodes[1], a
+        continue
+      $.prepend setting, [$.tn('['), a, $.tn('] ')]
     unless $.get 'firstrun'
       $.set 'firstrun', true
       # Prevent race conditions
@@ -2128,8 +2234,8 @@ Options =
     <ul>
       File Info Formatting
       <li><input name=fileInfo class=field> : <span id=fileInfoPreview class=fileText></span></li>
-      <li>Link (with original file name): %l (lowercase L, truncated), %L (untruncated)</li>
-      <li>Original file name: %n (Truncated), %N (Untruncated)</li>
+      <li>Link: %l (lowercase L, truncated), %L (untruncated), %t (Unix timestamp)</li>
+      <li>Original file name: %n (truncated), %N (untruncated), %T (Unix timestamp)</li>
       <li>Spoiler indicator: %p</li>
       <li>Size: %B (Bytes), %K (KB), %M (MB), %s (4chan default)</li>
       <li>Resolution: %r (Displays PDF on /po/, for PDFs)</li>
@@ -2296,7 +2402,7 @@ Options =
     $.id('backlinkPreview').textContent = Conf['backlink'].replace /%id/, '123456789'
   fileInfo: ->
     FileInfo.data =
-      link:       'javascript:;'
+      link:       '//images.4chan.org/g/src/1334437723720.jpg'
       spoiler:    true
       size:       '276'
       unit:       'KB'
@@ -2734,7 +2840,7 @@ FileInfo =
     node.setAttribute 'data-filename', filename
     node.innerHTML = FileInfo.funk FileInfo
   setFormats: ->
-    code = Conf['fileInfo'].replace /%([BKlLMnNprs])/g, (s, c) ->
+    code = Conf['fileInfo'].replace /%(.)/g, (s, c) ->
       if c of FileInfo.formatters
         "' + f.formatters.#{c}() + '"
       else
@@ -2755,6 +2861,8 @@ FileInfo =
         size = size.toFixed 2
     "#{size} #{unitT}"
   formatters:
+    t: -> FileInfo.data.link.match(/\d+\..+$/)[0]
+    T: -> "<a href=#{FileInfo.data.link} target=_blank>#{@t()}</a>"
     l: -> "<a href=#{FileInfo.data.link} target=_blank>#{@n()}</a>"
     L: -> "<a href=#{FileInfo.data.link} target=_blank>#{@N()}</a>"
     n: ->
@@ -3005,11 +3113,7 @@ Build =
       emailStart = ''
       emailEnd   = ''
 
-    subject =
-      if subject
-        "<span class=subject>#{subject}</span>"
-      else
-        ''
+    subject = "<span class=subject>#{subject or ''}</span>"
 
     userID =
       if !capcode and uniqueID
@@ -3056,11 +3160,11 @@ Build =
       fileHTML =
         if isOP
           "<div class=file id=f#{postID}><div class=fileInfo></div><span class=fileThumb>" +
-              "<img src='#{staticPath}/image/filedeleted.gif' alt='File deleted.'>" +
+              "<img src='#{staticPath}/image/filedeleted.gif' alt='File deleted.' class='fileDeleted retina'>" +
           "</span></div>"
         else
           "<div id=f#{postID} class=file><span class=fileThumb>" +
-            "<img src='#{staticPath}/image/filedeleted-res.gif' alt='File deleted.'>" +
+            "<img src='#{staticPath}/image/filedeleted-res.gif' alt='File deleted.' class='fileDeletedRes retina'>" +
           "</span></div>"
     else if file
       ext = file.name[-3..]
@@ -3206,7 +3310,7 @@ QuoteBacklink =
       # Stop at 'Admin/Mod/Dev Replies:' on /q/
       break if quote.parentNode.parentNode.className is 'capcodeReplies'
       # Don't process >>>/b/.
-      if qid = quote.hash[2..]
+      if !/catalog$/.test(quote.pathname) and qid = quote.hash[2..]
         # Duplicate quotes get overwritten.
         quotes[qid] = true
     a = $.el 'a',
@@ -3234,7 +3338,7 @@ QuoteInline =
     Main.callbacks.push @node
   node: (post) ->
     for quote in post.quotes
-      continue unless quote.hash or /\bdeadlink\b/.test quote.className
+      continue unless quote.hash and !/catalog$/.test(quote.pathname) or /\bdeadlink\b/.test quote.className
       $.on quote, 'click', QuoteInline.toggle
     for quote in post.backlinks
       $.on quote, 'click', QuoteInline.toggle
@@ -3303,7 +3407,8 @@ QuotePreview =
     Main.callbacks.push @node
   node: (post) ->
     for quote in post.quotes
-      $.on quote, 'mouseover', QuotePreview.mouseover if quote.hash or /\bdeadlink\b/.test quote.className
+      continue unless quote.hash and !/catalog$/.test(quote.pathname) or /\bdeadlink\b/.test quote.className
+      $.on quote, 'mouseover', QuotePreview.mouseover
     for quote in post.backlinks
       $.on quote, 'mouseover', QuotePreview.mouseover
     return
@@ -3356,6 +3461,8 @@ QuotePreview =
         FileInfo.node       post
       if Conf['Resurrect Quotes']
         Quotify.node        post
+      if Conf['Anonymize']
+        Anonymize.node      post
 
     $.on @, 'mousemove',      UI.hover
     $.on @, 'mouseout click', QuotePreview.mouseout
@@ -3396,7 +3503,7 @@ QuoteCT =
   node: (post) ->
     return if post.isInlined and not post.isCrosspost
     for quote in post.quotes
-      unless quote.hash
+      unless quote.hash and !/catalog$/.test quote.pathname
         # Make sure this isn't a link to the board we're on.
         continue
       path = quote.pathname.split '/'
@@ -3411,63 +3518,43 @@ Quotify =
     Main.callbacks.push @node
   node: (post) ->
     return if post.isInlined and not post.isCrosspost
+    for deadlink in $$ '.quote.deadlink', post.blockquote
+      quote = deadlink.textContent
+      a = $.el 'a',
+        # \u00A0 is nbsp
+        textContent: "#{quote}\u00A0(Dead)"
 
-    # XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE is 6
-    # Get all the text nodes that are not inside an anchor.
-    snapshot = d.evaluate './/text()[not(parent::a)]', post.blockquote, null, 6, null
+      id = quote.match(/\d+$/)[0]
 
-    for i in [0...snapshot.snapshotLength]
-      node = snapshot.snapshotItem i
-      data = node.data
+      if m = quote.match /^>>>\/([a-z\d]+)/
+        board = m[1]
+      else if postBoard
+        board = postBoard
+      else
+        # Get the post's board, whether it's inlined or not.
+        board = postBoard = $('a[title="Highlight this post"]', post.el).pathname.split('/')[1]
 
-      unless quotes = data.match />>(>\/[a-z\d]+\/)?\d+/g
-        # Only accept nodes with potentially valid links
-        continue
-
-      nodes = []
-
-      for quote in quotes
-        index   = data.indexOf quote
-        if text = data[...index]
-          # Potential text before this valid quote.
-          nodes.push $.tn text
-
-        id = quote.match(/\d+$/)[0]
-        board =
-          if m = quote.match /^>>>\/([a-z\d]+)/
-            m[1]
-          else
-            # Get the post's board, whether it's inlined or not.
-            $('a[title="Highlight this post"]', post.el).pathname.split('/')[1]
-
-        nodes.push a = $.el 'a',
-          # \u00A0 is nbsp
-          textContent: "#{quote}\u00A0(Dead)"
-
-        if board is g.BOARD and $.id "p#{id}"
-          a.href      = "#p#{id}"
-          a.className = 'quotelink'
-        else
-          a.href      = Redirect.thread board, 0, id
-          a.className = 'deadlink'
-          a.target    = '_blank'
-          if Redirect.post board, id
-            $.addClass a, 'quotelink'
-            # XXX WTF Scriptish/Greasemonkey?
-            # Setting dataset attributes that way doesn't affect the HTML,
-            # but are, I suspect, kept as object key/value pairs and GC'd later.
-            # a.dataset.board = board
-            # a.dataset.id    = id
-            a.setAttribute 'data-board', board
-            a.setAttribute 'data-id',    id
-
-        data = data[index + quote.length..]
-
-      if data
-        # Potential text after the last valid quote.
-        nodes.push $.tn data
-
-      $.replace node, nodes
+      if board is g.BOARD and $.id "p#{id}"
+        a.href      = "#p#{id}"
+        a.className = 'quotelink'
+      else
+        a.href =
+          Redirect.to
+            board:    board
+            threadID: 0
+            postID:   id
+        a.className = 'deadlink'
+        a.target    = '_blank'
+        if Redirect.post board, id
+          $.addClass a, 'quotelink'
+          # XXX WTF Scriptish/Greasemonkey?
+          # Setting dataset attributes that way doesn't affect the HTML,
+          # but are, I suspect, kept as object key/value pairs and GC'd later.
+          # a.dataset.board = board
+          # a.dataset.id    = id
+          a.setAttribute 'data-board', board
+          a.setAttribute 'data-id',    id
+      $.replace deadlink, a
     return
 
 DeleteLink =
@@ -3622,18 +3709,58 @@ DownloadLink =
 
 ArchiveLink =
   init: ->
-    a = $.el 'a',
-      className:   'archive_link'
-      target:      '_blank'
-      textContent: 'Archived post'
-    Menu.addEntry
-      el: a
+    div = $.el 'div',
+      textContent: 'Archive'
+
+    entry =
+      el: div
       open: (post) ->
         path = $('a[title="Highlight this post"]', post.el).pathname.split '/'
-        if (href = Redirect.thread path[1], path[3], post.ID) is "//boards.4chan.org/#{path[1]}/"
+        if (Redirect.to {board: path[1], threadID: path[3], postID: post.ID}) is "//boards.4chan.org/#{path[1]}/"
           return false
-        a.href = href
+        post.info = [path[1], path[3]]
         true
+      children: []
+
+    for type in [
+      ['Post',      'apost']
+      ['Name',      'name']
+      ['Tripcode',  'tripcode']
+      ['E-mail',    'email']
+      ['Subject',   'subject']
+      ['Filename',  'filename']
+      ['Image MD5', 'md5']
+    ]
+      # Add a sub entry for each type.
+      entry.children.push @createSubEntry type[0], type[1]
+
+    Menu.addEntry entry
+
+  createSubEntry: (text, type) ->
+
+    el = $.el 'a',
+      textContent: text
+      target: '_blank'
+
+    open = (post) ->
+      if type is 'apost'
+        el.href =
+          Redirect.to
+            board:    post.info[0]
+            threadID: post.info[1]
+            postID:   post.ID
+        return true
+      value = Filter[type] post
+      # We want to parse the exact same stuff as Filter does already.
+      return false unless value
+      el.href =
+        Redirect.to
+          board:    post.info[0]
+          type:     type
+          value:    value
+          isSearch: true
+
+    return el: el, open: open
 
 ThreadStats =
   init: ->
@@ -3787,26 +3914,22 @@ Redirect =
         "//nsfw.foolz.us/#{board}/full_image/#{filename}"
       when 'ck', 'lit'
         "//fuuka.warosu.org/#{board}/full_image/#{filename}"
-      when 'cgl', 'g', 'w'
-        "//archive.rebeccablacktech.com/#{board}/full_image/#{filename}"
+      when 'cgl', 'g', 'mu', 'w'
+        "//rbt.asia/#{board}/full_image/#{filename}"
       when 'an', 'k', 'toy', 'x'
         "http://archive.heinessen.com/#{board}/full_image/#{filename}"
-      # when 'e'
-      #   "https://www.cliché.net/4chan/cgi-board.pl/#{board}/full_image/#{filename}"
+      when 'c'
+        "//archive.nyafuu.org/#{board}/full_image/#{filename}"
   post: (board, postID) ->
     switch board
       when 'a', 'co', 'm', 'q', 'sp', 'tg', 'tv', 'v', 'vg', 'wsg', 'dev', 'foolz'
         "//archive.foolz.us/api/chan/post/board/#{board}/num/#{postID}/format/json"
       when 'u', 'kuku'
         "//nsfw.foolz.us/_/api/chan/post/?board=#{board}&num=#{postID}"
-  thread: (board, threadID, postID) ->
-    # keep the number only if the location.hash was sent f.e.
-    postID = postID.match(/\d+/)[0] if postID
-    path   =
-      if threadID
-        "#{board}/thread/#{threadID}"
-      else
-        "#{board}/post/#{postID}"
+  to: (data) ->
+    unless data.isSearch
+      {threadID} = data
+    {board} = data
     switch board
       when 'a', 'co', 'm', 'q', 'sp', 'tg', 'tv', 'v', 'vg', 'wsg', 'dev', 'foolz'
         url = "//archive.foolz.us/#{path}/"
@@ -3829,17 +3952,47 @@ Redirect =
         if threadID and postID
           url += "#p#{postID}"
       when 'an', 'fit', 'k', 'mlp', 'r9k', 'toy', 'x'
-        url = "http://archive.heinessen.com/#{path}"
-        if threadID and postID
-          url += "#p#{postID}"
-      when 'e'
-        url = "https://www.cliché.net/4chan/cgi-board.pl/#{path}"
-        if threadID and postID
-          url += "#p#{postID}"
+        url = Redirect.path 'http://archive.heinessen.com', 'fuuka', data
+      when 'c'
+        url = Redirect.path '//archive.nyafuu.org', 'fuuka', data
       else
         if threadID
           url = "//boards.4chan.org/#{board}/"
     url or null
+
+  path: (base, archiver, data) ->
+    if data.isSearch
+      {board, type, value} = data
+      type =
+        if type is 'name'
+          'username'
+        else if type is 'md5'
+          'image'
+        else
+          type
+      value = encodeURIComponent value
+      return if archiver is 'foolfuuka'
+          "#{base}/#{board}/search/#{type}/#{value}"
+        else if type is 'image'
+          "#{base}/#{board}/?task=search2&search_media_hash=#{value}"
+        else
+          "#{base}/#{board}/?task=search2&search_#{type}=#{value}"
+
+    {board, threadID, postID} = data
+    # keep the number only if the location.hash was sent f.e.
+    postID = postID.match(/\d+/)[0] if postID
+    path =
+      if threadID
+        "#{board}/thread/#{threadID}"
+      else
+        "#{board}/post/#{postID}"
+    if threadID and postID
+      path +=
+        if archiver is 'foolfuuka'
+          "##{postID}"
+        else
+          "#p#{postID}"
+    "#{base}/#{path}"
 
 ImageHover =
   init: ->
@@ -4036,6 +4189,41 @@ ImageExpand =
   resize: ->
     ImageExpand.style.textContent = ".fitheight img[data-md5] + img {max-height:#{d.documentElement.clientHeight}px;}"
 
+CatalogLinks =
+  init: ->
+    el = $.el 'span',
+      className: 'toggleCatalog'
+      innerHTML: '[<a href=javascript:;></a>]'
+    for nav in ['boardNavDesktop', 'boardNavDesktopFoot']
+      clone = el.cloneNode true
+      $.on clone.firstElementChild, 'click', @toggle
+      $.add $.id(nav), clone
+
+    # Set links on load.
+    @toggle true
+
+  toggle: (onLoad) ->
+    if onLoad is true
+      useCatalog = $.get 'CatalogIsToggled', g.CATALOG
+    else
+      useCatalog = @textContent is 'Catalog Off'
+      $.set 'CatalogIsToggled', useCatalog
+
+    for nav in ['boardNavDesktop', 'boardNavDesktopFoot']
+      root = $.id nav
+      for a in $$ 'a[href*="boards.4chan.org"]', root
+        board = a.pathname.split('/')[1]
+        if board is 'f'
+          # 4chan links to /f/'s catalog even if it doesn't have one.
+          a.pathname = '/f/'
+          continue
+        a.pathname = "/#{board}/#{if useCatalog then 'catalog' else ''}"
+
+      a = $('.toggleCatalog', root).firstElementChild
+      a.textContent = "Catalog #{if useCatalog then 'On' else 'Off'}"
+      a.title       = "Turn catalog links #{if useCatalog then 'off' else 'on'}."
+    return
+
 Main =
   init: ->
     Main.flatten null, Config
@@ -4043,9 +4231,12 @@ Main =
     path = location.pathname
     pathname = path[1..].split '/'
     [g.BOARD, temp] = pathname
-    if temp is 'res'
-      g.REPLY = true
-      g.THREAD_ID = pathname[2]
+    switch temp
+      when 'res'
+        g.REPLY = true
+        g.THREAD_ID = pathname[2]
+      when 'catalog'
+        g.CATALOG = true
 
     # Load values from localStorage.
     for key, val of Conf
@@ -4078,6 +4269,19 @@ Main =
       settings.disableAll = true
       localStorage.setItem '4chan-settings', JSON.stringify settings
 
+    if g.CATALOG
+      $.ready Main.catalog
+    else
+      Main.features()
+
+  catalog: ->
+    if Conf['Catalog Links']
+      CatalogLinks.init()
+
+    if Conf['Thread Hiding']
+      ThreadHiding.init()
+
+  features: ->
     Options.init()
 
     if Conf['Quick Reply'] and Conf['Hide Original Post Form']
@@ -4182,12 +4386,16 @@ Main =
     if Conf['Indicate Cross-thread Quotes']
       QuoteCT.init()
 
-    $.ready Main.ready
+    $.ready Main.featuresReady
 
-  ready: ->
+  featuresReady: ->
     if /^4chan - 404/.test d.title
       if Conf['404 Redirect'] and /^\d+$/.test g.THREAD_ID
-        location.href = Redirect.thread g.BOARD, g.THREAD_ID, location.hash
+        location.href =
+          Redirect.to
+            board:    g.BOARD
+            threadID: g.THREAD_ID
+            postID:   location.hash
       return
     unless $.id 'navtopright'
       return
@@ -4205,6 +4413,9 @@ Main =
 
     if Conf['Image Expansion']
       ImageExpand.init()
+
+    if Conf['Catalog Links']
+      CatalogLinks.init()
 
     if Conf['Thread Watcher']
       setTimeout -> Watcher.init()
@@ -4326,7 +4537,7 @@ Main =
     $.globalEval "(#{code})()".replace '_id_', bq.id
 
   namespace: '4chan_x.'
-  version: '2.35.4'
+  version: '2.37.0'
   callbacks: []
   css: '
 /* dialog styling */

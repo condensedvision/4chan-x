@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.35.4
+// @version        2.37.0
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -27,7 +27,7 @@
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012 Nicolas Stepien <stepien.nicolas@gmail.com>
  * http://mayhemydg.github.com/4chan-x/
- * 4chan X 2.35.4
+ * 4chan X 2.37.0
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -81,12 +81,13 @@
  */
 
 (function() {
-  var $, $$, Anonymize, ArchiveLink, AutoGif, Build, Conf, Config, DeleteLink, DownloadLink, ExpandComment, ExpandThread, Favicon, FileInfo, Filter, Get, ImageExpand, ImageHover, Keybinds, Main, Menu, Nav, Options, PngFix, QR, QuoteBacklink, QuoteCT, QuoteInline, QuoteOP, QuotePreview, Quotify, Redirect, ReplyHiding, ReportLink, RevealSpoilers, Sauce, StrikethroughQuotes, ThreadHiding, ThreadStats, Time, TitlePost, UI, Unread, Updater, Watcher, d, g;
+  var $, $$, Anonymize, ArchiveLink, AutoGif, Build, CatalogLinks, Conf, Config, DeleteLink, DownloadLink, ExpandComment, ExpandThread, Favicon, FileInfo, Filter, Get, ImageExpand, ImageHover, Keybinds, Main, Menu, Nav, Options, PngFix, QR, QuoteBacklink, QuoteCT, QuoteInline, QuoteOP, QuotePreview, Quotify, Redirect, ReplyHiding, ReportLink, RevealSpoilers, Sauce, StrikethroughQuotes, ThreadHiding, ThreadStats, Time, TitlePost, UI, Unread, Updater, Watcher, d, g;
 
   Config = {
     main: {
       Enhancing: {
         'Disable 4chan\'s extension': [true, 'Avoid conflicts between 4chan X and 4chan\'s inline extension.'],
+        'Catalog Links': [true, 'Turn Navigation links into links to each board\'s catalog.'],
         '404 Redirect': [true, 'Redirect dead threads and images'],
         'Keybinds': [true, 'Binds actions to keys'],
         'Time Formatting': [true, 'Arbitrarily formatted timestamps, using your local time'],
@@ -318,8 +319,9 @@
       return $.on(d, 'DOMContentLoaded', cb);
     },
     sync: function(key, cb) {
+      key = Main.namespace + key;
       return $.on(window, 'storage', function(e) {
-        if (e.key === ("" + Main.namespace + key)) {
+        if (e.key === key) {
           return cb(JSON.parse(e.newValue));
         }
       });
@@ -854,12 +856,13 @@
       _ref = post.quotes;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         quote = _ref[_i];
-        if ((el = $.id(quote.hash.slice(1))) && el.hidden) {
-          $.addClass(quote, 'filtered');
-          if (Conf['Recursive Filtering'] && post.ID !== post.threadID) {
-            show_stub = !!$.x('preceding-sibling::div[contains(@class,"stub")]', el);
-            ReplyHiding.hide(post.root, show_stub);
-          }
+        if (!((el = $.id(quote.hash.slice(1))) && !/catalog$/.test(quote.pathname) && el.hidden)) {
+          continue;
+        }
+        $.addClass(quote, 'filtered');
+        if (Conf['Recursive Filtering'] && post.ID !== post.threadID) {
+          show_stub = !!$.x('preceding-sibling::div[contains(@class,"stub")]', el);
+          ReplyHiding.hide(post.root, show_stub);
         }
       }
     }
@@ -1042,7 +1045,10 @@
   ThreadHiding = {
     init: function() {
       var a, hiddenThreads, thread, _i, _len, _ref;
-      hiddenThreads = $.get("hiddenThreads/" + g.BOARD + "/", {});
+      hiddenThreads = ThreadHiding.sync();
+      if (g.CATALOG) {
+        return;
+      }
       _ref = $$('.thread');
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         thread = _ref[_i];
@@ -1057,6 +1063,25 @@
           ThreadHiding.hide(thread);
         }
       }
+    },
+    sync: function() {
+      var hiddenThreads, hiddenThreadsCatalog, id;
+      hiddenThreads = $.get("hiddenThreads/" + g.BOARD + "/", {});
+      hiddenThreadsCatalog = JSON.parse(localStorage.getItem("4chan-hide-t-" + g.BOARD));
+      if (g.CATALOG) {
+        for (id in hiddenThreads) {
+          hiddenThreadsCatalog[id] = true;
+        }
+        localStorage.setItem("4chan-hide-t-" + g.BOARD, JSON.stringify(hiddenThreadsCatalog));
+      } else {
+        for (id in hiddenThreadsCatalog) {
+          if (!(id in hiddenThreads)) {
+            hiddenThreads[id] = Date.now();
+          }
+        }
+        $.set("hiddenThreads/" + g.BOARD + "/", hiddenThreads);
+      }
+      return hiddenThreads;
     },
     cb: function() {
       return ThreadHiding.toggle($.x('ancestor::div[parent::div[@class="board"]]', this));
@@ -1388,7 +1413,7 @@
       return $.on(d, 'keydown', Keybinds.keydown);
     },
     keydown: function(e) {
-      var key, link, o, target, thread;
+      var form, key, o, target, thread;
       if (!(key = Keybinds.keyCode(e))) {
         return;
       }
@@ -1455,13 +1480,13 @@
           window.location = "/" + g.BOARD + "/0#delform";
           break;
         case Conf.nextPage:
-          if (link = $('link[rel=next]', d.head)) {
-            window.location = link.href;
+          if (form = $('.next form')) {
+            window.location = form.action;
           }
           break;
         case Conf.previousPage:
-          if (link = $('link[rel=prev]', d.head)) {
-            window.location.href = link.href;
+          if (form = $('.prev form')) {
+            window.location = form.action;
           }
           break;
         case Conf.nextThread:
@@ -1738,7 +1763,7 @@
         $.on(link.firstChild, 'click', function() {
           QR.open();
           if (!g.REPLY) {
-            $('select', QR.el).value = 'new';
+            QR.threadSelector.value = g.BOARD === 'f' ? '9999' : 'new';
           }
           return $('textarea', QR.el).focus();
         });
@@ -1829,51 +1854,130 @@
         disabled = true;
         QR.cooldown.auto = false;
       }
-      value = QR.cooldown.seconds || data.progress || value;
+      value = data.progress || QR.cooldown.seconds || value;
       input = QR.status.input;
       input.value = QR.cooldown.auto && Conf['Cooldown'] ? value ? "Auto " + value : 'Auto' : value || 'Submit';
       return input.disabled = disabled || false;
     },
     cooldown: {
       init: function() {
-        var length, timeout, _ref;
         if (!Conf['Cooldown']) {
           return;
         }
-        _ref = $.get("/" + g.BOARD + "/cooldown", {}), timeout = _ref.timeout, length = _ref.length;
-        if (timeout) {
-          QR.cooldown.start(timeout, length);
+        QR.cooldown.types = {
+          thread: (function() {
+            switch (g.BOARD) {
+              case 'q':
+                return 86400;
+              case 'b':
+              case 'soc':
+              case 'r9k':
+                return 600;
+              default:
+                return 300;
+            }
+          })(),
+          sage: g.BOARD === 'q' ? 600 : 60,
+          file: g.BOARD === 'q' ? 300 : 30,
+          post: g.BOARD === 'q' ? 60 : 30
+        };
+        QR.cooldown.cooldowns = $.get("" + g.BOARD + ".cooldown", {});
+        QR.cooldown.start();
+        return $.sync("" + g.BOARD + ".cooldown", QR.cooldown.sync);
+      },
+      start: function() {
+        if (QR.cooldown.isCounting) {
+          return;
         }
-        return $.sync("/" + g.BOARD + "/cooldown", QR.cooldown.start);
+        QR.cooldown.isCounting = true;
+        return QR.cooldown.count();
       },
-      start: function(timeout, length) {
-        var seconds;
-        seconds = Math.floor((timeout - Date.now()) / 1000);
-        return QR.cooldown.count(seconds, length);
+      sync: function(cooldowns) {
+        var id;
+        for (id in cooldowns) {
+          QR.cooldown.cooldowns[id] = cooldowns[id];
+        }
+        return QR.cooldown.start();
       },
-      set: function(seconds) {
+      set: function(data) {
+        var cooldown, hasFile, isReply, isSage, start, type;
         if (!Conf['Cooldown']) {
           return;
         }
-        QR.cooldown.count(seconds, seconds);
-        return $.set("/" + g.BOARD + "/cooldown", {
-          timeout: Date.now() + seconds * $.SECOND,
-          length: seconds
-        });
+        start = Date.now();
+        if (data.delay) {
+          cooldown = {
+            delay: data.delay
+          };
+        } else {
+          isSage = /sage/i.test(data.post.email);
+          hasFile = !!data.post.file;
+          isReply = data.isReply;
+          type = !isReply ? 'thread' : isSage ? 'sage' : hasFile ? 'file' : 'post';
+          cooldown = {
+            isReply: isReply,
+            isSage: isSage,
+            hasFile: hasFile,
+            timeout: start + QR.cooldown.types[type] * $.SECOND
+          };
+        }
+        QR.cooldown.cooldowns[start] = cooldown;
+        $.set("" + g.BOARD + ".cooldown", QR.cooldown.cooldowns);
+        return QR.cooldown.start();
       },
-      count: function(seconds, length) {
-        if (!((0 <= seconds && seconds <= length))) {
+      unset: function(id) {
+        delete QR.cooldown.cooldowns[id];
+        return $.set("" + g.BOARD + ".cooldown", QR.cooldown.cooldowns);
+      },
+      count: function() {
+        var cooldown, cooldowns, elapsed, hasFile, isReply, isSage, now, post, seconds, start, type, types, update, _ref;
+        if (Object.keys(QR.cooldown.cooldowns).length) {
+          setTimeout(QR.cooldown.count, 1000);
+        } else {
+          $["delete"]("" + g.BOARD + ".cooldown");
+          delete QR.cooldown.isCounting;
+          delete QR.cooldown.seconds;
+          QR.status();
           return;
         }
-        setTimeout(QR.cooldown.count, 1000, seconds - 1, length);
-        QR.cooldown.seconds = seconds;
-        if (seconds === 0) {
-          $["delete"]("/" + g.BOARD + "/cooldown");
-          if (QR.cooldown.auto) {
-            QR.submit();
+        if ((isReply = g.REPLY ? true : QR.threadSelector.value !== 'new')) {
+          post = QR.replies[0];
+          isSage = /sage/i.test(post.email);
+          hasFile = !!post.file;
+        }
+        now = Date.now();
+        seconds = null;
+        _ref = QR.cooldown, types = _ref.types, cooldowns = _ref.cooldowns;
+        for (start in cooldowns) {
+          cooldown = cooldowns[start];
+          if ('delay' in cooldown) {
+            if (cooldown.delay) {
+              seconds = Math.max(seconds, cooldown.delay--);
+            } else {
+              seconds = Math.max(seconds, 0);
+              QR.cooldown.unset(start);
+            }
+            continue;
+          }
+          if (isReply === cooldown.isReply) {
+            type = !isReply ? 'thread' : isSage && cooldown.isSage ? 'sage' : hasFile && cooldown.hasFile ? 'file' : 'post';
+            elapsed = Math.floor((now - start) / 1000);
+            if (elapsed >= 0) {
+              seconds = Math.max(seconds, types[type] - elapsed);
+            }
+          }
+          if (!((start <= now && now <= cooldown.timeout))) {
+            QR.cooldown.unset(start);
           }
         }
-        return QR.status();
+        update = seconds !== null || !!QR.cooldown.seconds;
+        QR.cooldown.seconds = seconds;
+        if (update) {
+          QR.status();
+        }
+        if (seconds === 0 && QR.cooldown.auto) {
+          return QR.submit();
+        }
       }
     },
     quote: function(e) {
@@ -1883,7 +1987,7 @@
       }
       QR.open();
       if (!g.REPLY) {
-        $('select', QR.el).value = $.x('ancestor::div[parent::div[@class="board"]]', this).id.slice(1);
+        QR.threadSelector.value = $.x('ancestor::div[parent::div[@class="board"]]', this).id.slice(1);
       }
       id = this.previousSibling.hash.slice(2);
       text = ">>" + id + "\n";
@@ -2173,10 +2277,7 @@
           (QR.replies[index - 1] || QR.replies[index + 1]).select();
         }
         QR.replies.splice(index, 1);
-        if (typeof (_base = window.URL || window.webkitURL).revokeObjectURL === "function") {
-          _base.revokeObjectURL(this.url);
-        }
-        return delete this;
+        return typeof (_base = window.URL || window.webkitURL).revokeObjectURL === "function" ? _base.revokeObjectURL(this.url) : void 0;
       };
 
       return _Class;
@@ -2342,11 +2443,12 @@
           id = thread.id.slice(1);
           threads += "<option value=" + id + ">Thread " + id + "</option>";
         }
-        $.prepend($('.move > span', QR.el), $.el('select', {
+        QR.threadSelector = g.BOARD === 'f' ? $('select[name=filetag]').cloneNode(true) : $.el('select', {
           innerHTML: threads,
           title: 'Create a new thread / Reply to a thread'
-        }));
-        $.on($('select', QR.el), 'mousedown', function(e) {
+        });
+        $.prepend($('.move > span', QR.el), QR.threadSelector);
+        $.on(QR.threadSelector, 'mousedown', function(e) {
           return e.stopPropagation();
         });
       }
@@ -2380,7 +2482,7 @@
         $.on($("[name=" + name + "]", QR.el), 'input', function() {
           var _ref2;
           QR.selected[this.name] = this.value;
-          if (QR.cooldown.auto && QR.selected === QR.replies[0] && (0 < (_ref2 = QR.cooldown.seconds) && _ref2 < 6)) {
+          if (QR.cooldown.auto && QR.selected === QR.replies[0] && (0 < (_ref2 = QR.cooldown.seconds) && _ref2 <= 5)) {
             return QR.cooldown.auto = false;
           }
         });
@@ -2395,7 +2497,7 @@
       }));
     },
     submit: function(e) {
-      var callbacks, captcha, captchas, challenge, err, m, opts, post, reply, response, textOnly, threadID, _ref;
+      var callbacks, captcha, captchas, challenge, err, filetag, m, opts, post, reply, response, textOnly, threadID, _ref;
       if (e != null) {
         e.preventDefault();
       }
@@ -2406,17 +2508,23 @@
       }
       QR.abort();
       reply = QR.replies[0];
-      threadID = g.THREAD_ID || $('select', QR.el).value;
+      if (g.BOARD === 'f' && !g.REPLY) {
+        filetag = QR.threadSelector.value;
+        threadID = 'new';
+      } else {
+        threadID = g.THREAD_ID || QR.threadSelector.value;
+      }
       if (threadID === 'new') {
+        threadID = null;
         if (((_ref = g.BOARD) === 'vg' || _ref === 'q') && !reply.sub) {
           err = 'New threads require a subject.';
         } else if (!(reply.file || (textOnly = !!$('input[name=textonly]', $.id('postForm'))))) {
           err = 'No file selected.';
+        } else if (g.BOARD === 'f' && filetag === '9999') {
+          err = 'Invalid tag specified.';
         }
-      } else {
-        if (!(reply.com || reply.file)) {
-          err = 'No file selected.';
-        }
+      } else if (!(reply.com || reply.file)) {
+        err = 'No file selected.';
       }
       if (QR.captchaIsEnabled && !err) {
         captchas = $.get('captchas', []);
@@ -2467,6 +2575,7 @@
         sub: reply.sub,
         com: reply.com,
         upfile: reply.file,
+        filetag: filetag,
         spoiler: reply.spoiler,
         textonly: textOnly,
         mode: 'regist',
@@ -2506,7 +2615,7 @@
       return QR.ajax = $.ajax($.id('postForm').parentNode.action, callbacks, opts);
     },
     response: function(html) {
-      var bs, doc, err, msg, persona, postID, reply, sage, seconds, threadID, _, _ref, _ref1;
+      var bs, doc, err, msg, persona, postID, reply, threadID, _, _ref, _ref1;
       doc = d.implementation.createHTMLDocument('');
       doc.documentElement.innerHTML = html;
       if (doc.title === '4chan - Banned') {
@@ -2527,7 +2636,9 @@
             err.textContent = 'Error: You seem to have mistyped the CAPTCHA.';
           }
           QR.cooldown.auto = QR.captchaIsEnabled ? !!$.get('captchas', []).length : true;
-          QR.cooldown.set(2);
+          QR.cooldown.set({
+            delay: 2
+          });
         } else {
           QR.cooldown.auto = false;
         }
@@ -2551,13 +2662,14 @@
           postID: postID
         }
       }));
+      QR.cooldown.set({
+        post: reply,
+        isReply: threadID !== '0'
+      });
       if (threadID === '0') {
         location.pathname = "/" + g.BOARD + "/res/" + postID;
       } else {
         QR.cooldown.auto = QR.replies.length > 1;
-        sage = /sage/i.test(reply.email);
-        seconds = g.BOARD === 'q' ? sage ? 600 : reply.file ? 300 : 60 : sage ? 60 : 30;
-        QR.cooldown.set(seconds);
         if (Conf['Open Reply in New Tab'] && !g.REPLY && !QR.cooldown.auto) {
           $.open("//boards.4chan.org/" + g.BOARD + "/res/" + threadID + "#p" + postID);
         }
@@ -2585,7 +2697,7 @@
       return $.ready(Options.initReady);
     },
     initReady: function() {
-      var a, settings, _i, _len, _ref;
+      var a, setting, settings, _i, _len, _ref;
       _ref = ['navtopright', 'navbotright'];
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         settings = _ref[_i];
@@ -2595,7 +2707,12 @@
           textContent: '4chan X'
         });
         $.on(a, 'click', Options.dialog);
-        $.prepend($.id(settings), [$.tn('['), a, $.tn('] ')]);
+        setting = $.id(settings);
+        if (Conf['Disable 4chan\'s extension']) {
+          $.replace(setting.childNodes[1], a);
+          continue;
+        }
+        $.prepend(setting, [$.tn('['), a, $.tn('] ')]);
       }
       if (!$.get('firstrun')) {
         $.set('firstrun', true);
@@ -2683,8 +2800,8 @@
     <ul>\
       File Info Formatting\
       <li><input name=fileInfo class=field> : <span id=fileInfoPreview class=fileText></span></li>\
-      <li>Link (with original file name): %l (lowercase L, truncated), %L (untruncated)</li>\
-      <li>Original file name: %n (Truncated), %N (Untruncated)</li>\
+      <li>Link: %l (lowercase L, truncated), %L (untruncated), %t (Unix timestamp)</li>\
+      <li>Original file name: %n (truncated), %N (untruncated), %T (Unix timestamp)</li>\
       <li>Spoiler indicator: %p</li>\
       <li>Size: %B (Bytes), %K (KB), %M (MB), %s (4chan default)</li>\
       <li>Resolution: %r (Displays PDF on /po/, for PDFs)</li>\
@@ -2869,7 +2986,7 @@
     },
     fileInfo: function() {
       FileInfo.data = {
-        link: 'javascript:;',
+        link: '//images.4chan.org/g/src/1334437723720.jpg',
         spoiler: true,
         size: '276',
         unit: 'KB',
@@ -3451,7 +3568,7 @@
     },
     setFormats: function() {
       var code;
-      code = Conf['fileInfo'].replace(/%([BKlLMnNprs])/g, function(s, c) {
+      code = Conf['fileInfo'].replace(/%(.)/g, function(s, c) {
         if (c in FileInfo.formatters) {
           return "' + f.formatters." + c + "() + '";
         } else {
@@ -3486,6 +3603,12 @@
       return "" + size + " " + unitT;
     },
     formatters: {
+      t: function() {
+        return FileInfo.data.link.match(/\d+\..+$/)[0];
+      },
+      T: function() {
+        return "<a href=" + FileInfo.data.link + " target=_blank>" + (this.t()) + "</a>";
+      },
       l: function() {
         return "<a href=" + FileInfo.data.link + " target=_blank>" + (this.n()) + "</a>";
       },
@@ -3786,7 +3909,7 @@
         emailStart = '';
         emailEnd = '';
       }
-      subject = subject ? "<span class=subject>" + subject + "</span>" : '';
+      subject = "<span class=subject>" + (subject || '') + "</span>";
       userID = !capcode && uniqueID ? (" <span class='posteruid id_" + uniqueID + "'>(ID: ") + ("<span class=hand title='Highlight posts by this ID'>" + uniqueID + "</span>)</span> ") : '';
       switch (capcode) {
         case 'admin':
@@ -3812,7 +3935,7 @@
       }
       flag = flagCode ? (" <img src='" + staticPath + "/image/country/" + (board === 'pol' ? 'troll/' : '')) + flagCode.toLowerCase() + (".gif' alt=" + flagCode + " title='" + flagName + "' class=countryFlag>") : '';
       if (file != null ? file.isDeleted : void 0) {
-        fileHTML = isOP ? ("<div class=file id=f" + postID + "><div class=fileInfo></div><span class=fileThumb>") + ("<img src='" + staticPath + "/image/filedeleted.gif' alt='File deleted.'>") + "</span></div>" : ("<div id=f" + postID + " class=file><span class=fileThumb>") + ("<img src='" + staticPath + "/image/filedeleted-res.gif' alt='File deleted.'>") + "</span></div>";
+        fileHTML = isOP ? ("<div class=file id=f" + postID + "><div class=fileInfo></div><span class=fileThumb>") + ("<img src='" + staticPath + "/image/filedeleted.gif' alt='File deleted.' class='fileDeleted retina'>") + "</span></div>" : ("<div id=f" + postID + " class=file><span class=fileThumb>") + ("<img src='" + staticPath + "/image/filedeleted-res.gif' alt='File deleted.' class='fileDeletedRes retina'>") + "</span></div>";
       } else if (file) {
         ext = file.name.slice(-3);
         if (!file.twidth && !file.theight && ext === 'gif') {
@@ -3893,7 +4016,7 @@
         if (quote.parentNode.parentNode.className === 'capcodeReplies') {
           break;
         }
-        if (qid = quote.hash.slice(2)) {
+        if (!/catalog$/.test(quote.pathname) && (qid = quote.hash.slice(2))) {
           quotes[qid] = true;
         }
       }
@@ -3934,7 +4057,7 @@
       _ref = post.quotes;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         quote = _ref[_i];
-        if (!(quote.hash || /\bdeadlink\b/.test(quote.className))) {
+        if (!(quote.hash && !/catalog$/.test(quote.pathname) || /\bdeadlink\b/.test(quote.className))) {
           continue;
         }
         $.on(quote, 'click', QuoteInline.toggle);
@@ -4027,9 +4150,10 @@
       _ref = post.quotes;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         quote = _ref[_i];
-        if (quote.hash || /\bdeadlink\b/.test(quote.className)) {
-          $.on(quote, 'mouseover', QuotePreview.mouseover);
+        if (!(quote.hash && !/catalog$/.test(quote.pathname) || /\bdeadlink\b/.test(quote.className))) {
+          continue;
         }
+        $.on(quote, 'mouseover', QuotePreview.mouseover);
       }
       _ref1 = post.backlinks;
       for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
@@ -4096,7 +4220,10 @@
           FileInfo.node(post);
         }
         if (Conf['Resurrect Quotes']) {
-          return Quotify.node(post);
+          Quotify.node(post);
+        }
+        if (Conf['Anonymize']) {
+          return Anonymize.node(post);
         }
       });
       $.on(this, 'mousemove', UI.hover);
@@ -4163,7 +4290,7 @@
       _ref = post.quotes;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         quote = _ref[_i];
-        if (!quote.hash) {
+        if (!(quote.hash && !/catalog$/.test(quote.pathname))) {
           continue;
         }
         path = quote.pathname.split('/');
@@ -4179,48 +4306,43 @@
       return Main.callbacks.push(this.node);
     },
     node: function(post) {
-      var a, board, data, i, id, index, m, node, nodes, quote, quotes, snapshot, text, _i, _j, _len, _ref;
+      var a, board, deadlink, id, m, postBoard, quote, _i, _len, _ref;
       if (post.isInlined && !post.isCrosspost) {
         return;
       }
-      snapshot = d.evaluate('.//text()[not(parent::a)]', post.blockquote, null, 6, null);
-      for (i = _i = 0, _ref = snapshot.snapshotLength; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
-        node = snapshot.snapshotItem(i);
-        data = node.data;
-        if (!(quotes = data.match(/>>(>\/[a-z\d]+\/)?\d+/g))) {
-          continue;
+      _ref = $$('.quote.deadlink', post.blockquote);
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        deadlink = _ref[_i];
+        quote = deadlink.textContent;
+        a = $.el('a', {
+          textContent: "" + quote + "\u00A0(Dead)"
+        });
+        id = quote.match(/\d+$/)[0];
+        if (m = quote.match(/^>>>\/([a-z\d]+)/)) {
+          board = m[1];
+        } else if (postBoard) {
+          board = postBoard;
+        } else {
+          board = postBoard = $('a[title="Highlight this post"]', post.el).pathname.split('/')[1];
         }
-        nodes = [];
-        for (_j = 0, _len = quotes.length; _j < _len; _j++) {
-          quote = quotes[_j];
-          index = data.indexOf(quote);
-          if (text = data.slice(0, index)) {
-            nodes.push($.tn(text));
+        if (board === g.BOARD && $.id("p" + id)) {
+          a.href = "#p" + id;
+          a.className = 'quotelink';
+        } else {
+          a.href = Redirect.to({
+            board: board,
+            threadID: 0,
+            postID: id
+          });
+          a.className = 'deadlink';
+          a.target = '_blank';
+          if (Redirect.post(board, id)) {
+            $.addClass(a, 'quotelink');
+            a.setAttribute('data-board', board);
+            a.setAttribute('data-id', id);
           }
-          id = quote.match(/\d+$/)[0];
-          board = (m = quote.match(/^>>>\/([a-z\d]+)/)) ? m[1] : $('a[title="Highlight this post"]', post.el).pathname.split('/')[1];
-          nodes.push(a = $.el('a', {
-            textContent: "" + quote + "\u00A0(Dead)"
-          }));
-          if (board === g.BOARD && $.id("p" + id)) {
-            a.href = "#p" + id;
-            a.className = 'quotelink';
-          } else {
-            a.href = Redirect.thread(board, 0, id);
-            a.className = 'deadlink';
-            a.target = '_blank';
-            if (Redirect.post(board, id)) {
-              $.addClass(a, 'quotelink');
-              a.setAttribute('data-board', board);
-              a.setAttribute('data-id', id);
-            }
-          }
-          data = data.slice(index + quote.length);
         }
-        if (data) {
-          nodes.push($.tn(data));
-        }
-        $.replace(node, nodes);
+        $.replace(deadlink, a);
       }
     }
   };
@@ -4411,24 +4533,65 @@
 
   ArchiveLink = {
     init: function() {
-      var a;
-      a = $.el('a', {
-        className: 'archive_link',
-        target: '_blank',
-        textContent: 'Archived post'
+      var div, entry, type, _i, _len, _ref;
+      div = $.el('div', {
+        textContent: 'Archive'
       });
-      return Menu.addEntry({
-        el: a,
+      entry = {
+        el: div,
         open: function(post) {
-          var href, path;
+          var path;
           path = $('a[title="Highlight this post"]', post.el).pathname.split('/');
-          if ((href = Redirect.thread(path[1], path[3], post.ID)) === ("//boards.4chan.org/" + path[1] + "/")) {
+          if ((Redirect.to({
+            board: path[1],
+            threadID: path[3],
+            postID: post.ID
+          })) === ("//boards.4chan.org/" + path[1] + "/")) {
             return false;
           }
-          a.href = href;
+          post.info = [path[1], path[3]];
+          return true;
+        },
+        children: []
+      };
+      _ref = [['Post', 'apost'], ['Name', 'name'], ['Tripcode', 'tripcode'], ['E-mail', 'email'], ['Subject', 'subject'], ['Filename', 'filename'], ['Image MD5', 'md5']];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        type = _ref[_i];
+        entry.children.push(this.createSubEntry(type[0], type[1]));
+      }
+      return Menu.addEntry(entry);
+    },
+    createSubEntry: function(text, type) {
+      var el, open;
+      el = $.el('a', {
+        textContent: text,
+        target: '_blank'
+      });
+      open = function(post) {
+        var value;
+        if (type === 'apost') {
+          el.href = Redirect.to({
+            board: post.info[0],
+            threadID: post.info[1],
+            postID: post.ID
+          });
           return true;
         }
-      });
+        value = Filter[type](post);
+        if (!value) {
+          return false;
+        }
+        return el.href = Redirect.to({
+          board: post.info[0],
+          type: type,
+          value: value,
+          isSearch: true
+        });
+      };
+      return {
+        el: el,
+        open: open
+      };
     }
   };
 
@@ -4618,13 +4781,16 @@
           return "//fuuka.warosu.org/" + board + "/full_image/" + filename;
         case 'cgl':
         case 'g':
+        case 'mu':
         case 'w':
-          return "//archive.rebeccablacktech.com/" + board + "/full_image/" + filename;
+          return "//rbt.asia/" + board + "/full_image/" + filename;
         case 'an':
         case 'k':
         case 'toy':
         case 'x':
           return "http://archive.heinessen.com/" + board + "/full_image/" + filename;
+        case 'c':
+          return "//archive.nyafuu.org/" + board + "/full_image/" + filename;
       }
     },
     post: function(board, postID) {
@@ -4647,12 +4813,12 @@
           return "//nsfw.foolz.us/_/api/chan/post/?board=" + board + "&num=" + postID;
       }
     },
-    thread: function(board, threadID, postID) {
-      var path, url;
-      if (postID) {
-        postID = postID.match(/\d+/)[0];
+    to: function(data) {
+      var board, threadID, url;
+      if (!data.isSearch) {
+        threadID = data.threadID;
       }
-      path = threadID ? "" + board + "/thread/" + threadID : "" + board + "/post/" + postID;
+      board = data.board;
       switch (board) {
         case 'a':
         case 'co':
@@ -4710,16 +4876,10 @@
         case 'r9k':
         case 'toy':
         case 'x':
-          url = "http://archive.heinessen.com/" + path;
-          if (threadID && postID) {
-            url += "#p" + postID;
-          }
+          url = Redirect.path('http://archive.heinessen.com', 'fuuka', data);
           break;
-        case 'e':
-          url = "https://www.cliché.net/4chan/cgi-board.pl/" + path;
-          if (threadID && postID) {
-            url += "#p" + postID;
-          }
+        case 'c':
+          url = Redirect.path('//archive.nyafuu.org', 'fuuka', data);
           break;
         default:
           if (threadID) {
@@ -4727,6 +4887,30 @@
           }
       }
       return url || null;
+    },
+    path: function(base, archiver, data) {
+      var board, path, postID, threadID, type, value;
+      if (data.isSearch) {
+        board = data.board, type = data.type, value = data.value;
+        type = type === 'name' ? 'username' : type === 'md5' ? 'image' : type;
+        value = encodeURIComponent(value);
+        if (archiver === 'foolfuuka') {
+          return "" + base + "/" + board + "/search/" + type + "/" + value;
+        } else if (type === 'image') {
+          return "" + base + "/" + board + "/?task=search2&search_media_hash=" + value;
+        } else {
+          return "" + base + "/" + board + "/?task=search2&search_" + type + "=" + value;
+        }
+      }
+      board = data.board, threadID = data.threadID, postID = data.postID;
+      if (postID) {
+        postID = postID.match(/\d+/)[0];
+      }
+      path = threadID ? "" + board + "/thread/" + threadID : "" + board + "/post/" + postID;
+      if (threadID && postID) {
+        path += archiver === 'foolfuuka' ? "#" + postID : "#p" + postID;
+      }
+      return "" + base + "/" + path;
     }
   };
 
@@ -5028,16 +5212,65 @@
     }
   };
 
+  CatalogLinks = {
+    init: function() {
+      var clone, el, nav, _i, _len, _ref;
+      el = $.el('span', {
+        className: 'toggleCatalog',
+        innerHTML: '[<a href=javascript:;></a>]'
+      });
+      _ref = ['boardNavDesktop', 'boardNavDesktopFoot'];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        nav = _ref[_i];
+        clone = el.cloneNode(true);
+        $.on(clone.firstElementChild, 'click', this.toggle);
+        $.add($.id(nav), clone);
+      }
+      return this.toggle(true);
+    },
+    toggle: function(onLoad) {
+      var a, board, nav, root, useCatalog, _i, _j, _len, _len1, _ref, _ref1;
+      if (onLoad === true) {
+        useCatalog = $.get('CatalogIsToggled', g.CATALOG);
+      } else {
+        useCatalog = this.textContent === 'Catalog Off';
+        $.set('CatalogIsToggled', useCatalog);
+      }
+      _ref = ['boardNavDesktop', 'boardNavDesktopFoot'];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        nav = _ref[_i];
+        root = $.id(nav);
+        _ref1 = $$('a[href*="boards.4chan.org"]', root);
+        for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
+          a = _ref1[_j];
+          board = a.pathname.split('/')[1];
+          if (board === 'f') {
+            a.pathname = '/f/';
+            continue;
+          }
+          a.pathname = "/" + board + "/" + (useCatalog ? 'catalog' : '');
+        }
+        a = $('.toggleCatalog', root).firstElementChild;
+        a.textContent = "Catalog " + (useCatalog ? 'On' : 'Off');
+        a.title = "Turn catalog links " + (useCatalog ? 'off' : 'on') + ".";
+      }
+    }
+  };
+
   Main = {
     init: function() {
-      var cutoff, hiddenThreads, id, key, now, path, pathname, settings, temp, timestamp, val, _ref;
+      var key, path, pathname, settings, temp, val;
       Main.flatten(null, Config);
       path = location.pathname;
       pathname = path.slice(1).split('/');
       g.BOARD = pathname[0], temp = pathname[1];
-      if (temp === 'res') {
-        g.REPLY = true;
-        g.THREAD_ID = pathname[2];
+      switch (temp) {
+        case 'res':
+          g.REPLY = true;
+          g.THREAD_ID = pathname[2];
+          break;
+        case 'catalog':
+          g.CATALOG = true;
       }
       for (key in Conf) {
         val = Conf[key];
@@ -5085,6 +5318,22 @@
         settings.disableAll = true;
         localStorage.setItem('4chan-settings', JSON.stringify(settings));
       }
+      if (g.CATALOG) {
+        return $.ready(Main.catalog);
+      } else {
+        return Main.features();
+      }
+    },
+    catalog: function() {
+      if (Conf['Catalog Links']) {
+        CatalogLinks.init();
+      }
+      if (Conf['Thread Hiding']) {
+        return ThreadHiding.init();
+      }
+    },
+    features: function() {
+      var cutoff, hiddenThreads, id, now, timestamp, _ref;
       Options.init();
       if (Conf['Quick Reply'] && Conf['Hide Original Post Form']) {
         Main.css += '#postForm { display: none; }';
@@ -5190,13 +5439,17 @@
       if (Conf['Indicate Cross-thread Quotes']) {
         QuoteCT.init();
       }
-      return $.ready(Main.ready);
+      return $.ready(Main.featuresReady);
     },
-    ready: function() {
+    featuresReady: function() {
       var MutationObserver, a, board, nav, node, nodes, observer, _i, _j, _len, _len1, _ref, _ref1;
       if (/^4chan - 404/.test(d.title)) {
         if (Conf['404 Redirect'] && /^\d+$/.test(g.THREAD_ID)) {
-          location.href = Redirect.thread(g.BOARD, g.THREAD_ID, location.hash);
+          location.href = Redirect.to({
+            board: g.BOARD,
+            threadID: g.THREAD_ID,
+            postID: location.hash
+          });
         }
         return;
       }
@@ -5218,6 +5471,9 @@
       }
       if (Conf['Image Expansion']) {
         ImageExpand.init();
+      }
+      if (Conf['Catalog Links']) {
+        CatalogLinks.init();
       }
       if (Conf['Thread Watcher']) {
         setTimeout(function() {
@@ -5391,7 +5647,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.35.4',
+    version: '2.37.0',
     callbacks: [],
     css: '\
 /* dialog styling */\
