@@ -1254,6 +1254,7 @@ Keybinds =
     $('textarea', QR.el).focus()
 
   open: (thread, tab) ->
+    return if g.REPLY
     id = thread.id[1..]
     url = "//boards.4chan.org/#{g.BOARD}/res/#{id}"
     if tab
@@ -2056,14 +2057,15 @@ QR =
   response: (html) ->
     doc = d.implementation.createHTMLDocument ''
     doc.documentElement.innerHTML = html
-    if doc.title is '4chan - Banned' # Ban/warn check
-      bs  = $$ 'b', doc
-      err = $.el 'span',
-        innerHTML:
-          if /^You were issued a warning/.test $('.boxcontent', doc).textContent.trim()
-            "You were issued a warning on #{bs[0].innerHTML} as #{bs[3].innerHTML}.<br>Warning reason: #{bs[1].innerHTML}"
-          else
-            "You are banned! ;_;<br>Please click <a href=//www.4chan.org/banned target=_blank>HERE</a> to see the reason."
+    if ban  = $ '.banType', doc # banned/warning
+      board = $('.board', doc).innerHTML
+      err   = $.el 'span', innerHTML:
+        if ban.textContent.toLowerCase() is 'banned'
+          "You are banned on #{board}! ;_;<br>" +
+          "Click <a href=//www.4chan.org/banned target=_blank>here</a> to see the reason."
+        else
+          "You were issued a warning on #{board} as #{$('.nameBlock', doc).innerHTML}.<br>" +
+          "Reason: #{$('.reason', doc).innerHTML}"
     else if err = doc.getElementById 'errmsg' # error!
       $('a', err)?.target = '_blank' # duplicate image link
     else unless msg = $ 'b', doc
@@ -3516,12 +3518,17 @@ Quotify =
   node: (post) ->
     return if post.isInlined and not post.isCrosspost
     for deadlink in $$ '.quote.deadlink', post.blockquote
+
+      if deadlink.parentNode.className is 'prettyprint'
+        $.replace deadlink, Array::slice.call deadlink.childNodes
+        continue
+
       quote = deadlink.textContent
       a = $.el 'a',
         # \u00A0 is nbsp
         textContent: "#{quote}\u00A0(Dead)"
 
-      id = quote.match(/\d+$/)[0]
+      continue unless id = quote.match(/\d+$/)?[0]
 
       if m = quote.match /^>>>\/([a-z\d]+)/
         board = m[1]
@@ -3973,6 +3980,8 @@ Redirect =
         "#{board}/thread/#{threadID}"
       else
         "#{board}/post/#{postID}"
+    if archiver is 'foolfuuka'
+      path += '/'
     if threadID and postID
       path +=
         if archiver is 'foolfuuka'
@@ -4112,12 +4121,15 @@ ImageExpand =
     thumb = a.firstChild
     if thumb.hidden
       rect = a.getBoundingClientRect()
-      if $.engine is 'webkit'
-        d.body.scrollTop  += rect.top - 42 if rect.top < 0
-        d.body.scrollLeft += rect.left     if rect.left < 0
-      else
-        d.documentElement.scrollTop  += rect.top - 42 if rect.top < 0
-        d.documentElement.scrollLeft += rect.left     if rect.left < 0
+      if rect.bottom > 0 # should be at least partially visible.
+        # Scroll back to the thumbnail when contracting the image
+        # to avoid being left miles away from the relevant post.
+        if $.engine is 'webkit'
+          d.body.scrollTop  += rect.top - 42 if rect.top < 0
+          d.body.scrollLeft += rect.left     if rect.left < 0
+        else
+          d.documentElement.scrollTop  += rect.top - 42 if rect.top < 0
+          d.documentElement.scrollLeft += rect.left     if rect.left < 0
       ImageExpand.contract thumb
     else
       ImageExpand.expand thumb

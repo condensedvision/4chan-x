@@ -1633,6 +1633,9 @@
     },
     open: function(thread, tab) {
       var id, url;
+      if (g.REPLY) {
+        return;
+      }
       id = thread.id.slice(1);
       url = "//boards.4chan.org/" + g.BOARD + "/res/" + id;
       if (tab) {
@@ -2609,13 +2612,13 @@
       return QR.ajax = $.ajax($.id('postForm').parentNode.action, callbacks, opts);
     },
     response: function(html) {
-      var bs, doc, err, msg, persona, postID, reply, threadID, _, _ref, _ref1;
+      var ban, board, doc, err, msg, persona, postID, reply, threadID, _, _ref, _ref1;
       doc = d.implementation.createHTMLDocument('');
       doc.documentElement.innerHTML = html;
-      if (doc.title === '4chan - Banned') {
-        bs = $$('b', doc);
+      if (ban = $('.banType', doc)) {
+        board = $('.board', doc).innerHTML;
         err = $.el('span', {
-          innerHTML: /^You were issued a warning/.test($('.boxcontent', doc).textContent.trim()) ? "You were issued a warning on " + bs[0].innerHTML + " as " + bs[3].innerHTML + ".<br>Warning reason: " + bs[1].innerHTML : "You are banned! ;_;<br>Please click <a href=//www.4chan.org/banned target=_blank>HERE</a> to see the reason."
+          innerHTML: ban.textContent.toLowerCase() === 'banned' ? ("You are banned on " + board + "! ;_;<br>") + "Click <a href=//www.4chan.org/banned target=_blank>here</a> to see the reason." : ("You were issued a warning on " + board + " as " + ($('.nameBlock', doc).innerHTML) + ".<br>") + ("Reason: " + ($('.reason', doc).innerHTML))
         });
       } else if (err = doc.getElementById('errmsg')) {
         if ((_ref = $('a', err)) != null) {
@@ -4300,18 +4303,24 @@
       return Main.callbacks.push(this.node);
     },
     node: function(post) {
-      var a, board, deadlink, id, m, postBoard, quote, _i, _len, _ref;
+      var a, board, deadlink, id, m, postBoard, quote, _i, _len, _ref, _ref1;
       if (post.isInlined && !post.isCrosspost) {
         return;
       }
       _ref = $$('.quote.deadlink', post.blockquote);
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         deadlink = _ref[_i];
+        if (deadlink.parentNode.className === 'prettyprint') {
+          $.replace(deadlink, Array.prototype.slice.call(deadlink.childNodes));
+          continue;
+        }
         quote = deadlink.textContent;
         a = $.el('a', {
           textContent: "" + quote + "\u00A0(Dead)"
         });
-        id = quote.match(/\d+$/)[0];
+        if (!(id = (_ref1 = quote.match(/\d+$/)) != null ? _ref1[0] : void 0)) {
+          continue;
+        }
         if (m = quote.match(/^>>>\/([a-z\d]+)/)) {
           board = m[1];
         } else if (postBoard) {
@@ -4885,6 +4894,9 @@
         postID = postID.match(/\d+/)[0];
       }
       path = threadID ? "" + board + "/thread/" + threadID : "" + board + "/post/" + postID;
+      if (archiver === 'foolfuuka') {
+        path += '/';
+      }
       if (threadID && postID) {
         path += archiver === 'foolfuuka' ? "#" + postID : "#p" + postID;
       }
@@ -5098,19 +5110,21 @@
       thumb = a.firstChild;
       if (thumb.hidden) {
         rect = a.getBoundingClientRect();
-        if ($.engine === 'webkit') {
-          if (rect.top < 0) {
-            d.body.scrollTop += rect.top - 42;
-          }
-          if (rect.left < 0) {
-            d.body.scrollLeft += rect.left;
-          }
-        } else {
-          if (rect.top < 0) {
-            d.documentElement.scrollTop += rect.top - 42;
-          }
-          if (rect.left < 0) {
-            d.documentElement.scrollLeft += rect.left;
+        if (rect.bottom > 0) {
+          if ($.engine === 'webkit') {
+            if (rect.top < 0) {
+              d.body.scrollTop += rect.top - 42;
+            }
+            if (rect.left < 0) {
+              d.body.scrollLeft += rect.left;
+            }
+          } else {
+            if (rect.top < 0) {
+              d.documentElement.scrollTop += rect.top - 42;
+            }
+            if (rect.left < 0) {
+              d.documentElement.scrollLeft += rect.left;
+            }
           }
         }
         return ImageExpand.contract(thumb);
