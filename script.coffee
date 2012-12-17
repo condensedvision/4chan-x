@@ -2436,7 +2436,6 @@ Updater =
     @timer  = $ '#timer', dialog
     @thread = $.id "t#{g.THREAD_ID}"
 
-    @unsuccessfulFetchCount = 0
     @lastModified = '0'
 
     for input in $$ 'input', dialog
@@ -2467,13 +2466,11 @@ Updater =
   cb:
     post: ->
       return unless Conf['Auto Update This']
-      Updater.unsuccessfulFetchCount = 0
       setTimeout Updater.update, 500
     visibility: ->
       state = d.visibilityState or d.oVisibilityState or d.mozVisibilityState or d.webkitVisibilityState
       return if state isnt 'visible'
       # Reset the counter when we focus this tab.
-      Updater.unsuccessfulFetchCount = 0
       if Updater.timer.textContent < -Conf['Interval']
         Updater.set 'timer', -Conf['Interval']
     interval: ->
@@ -2522,18 +2519,16 @@ Updater =
           By sending the `If-Modified-Since` header we get a proper status code, and no response.
           This saves bandwidth for both the user and the servers and avoid unnecessary computation.
           ###
-          Updater.unsuccessfulFetchCount++
-          Updater.set 'timer', -Updater.getInterval()
+          Updater.set 'timer', -Conf['Interval']
           if Conf['Verbose']
             Updater.set 'count', '+0'
             Updater.count.className = null
         when 200
           Updater.lastModified = @getResponseHeader 'Last-Modified'
           Updater.cb.update JSON.parse(@response).posts
-          Updater.set 'timer', -Updater.getInterval()
+          Updater.set 'timer', -Conf['Interval']
         else
-          Updater.unsuccessfulFetchCount++
-          Updater.set 'timer', -Updater.getInterval()
+          Updater.set 'timer', -Conf['Interval']
           if Conf['Verbose']
             Updater.set 'count', @statusText
             Updater.count.className = 'warning'
@@ -2553,12 +2548,6 @@ Updater =
       if Conf['Verbose']
         Updater.set 'count', "+#{count}"
         Updater.count.className = if count then 'new' else null
-
-      if count
-        Updater.unsuccessfulFetchCount = 0
-      else
-        Updater.unsuccessfulFetchCount++
-        return
 
       scroll = Conf['Scrolling'] and Updater.scrollBG() and
         lastPost.getBoundingClientRect().bottom - d.documentElement.clientHeight < 25
@@ -2582,7 +2571,6 @@ Updater =
     if n is 0
       Updater.update()
     else if n >= Conf['Interval']
-      Updater.unsuccessfulFetchCount++
       Updater.set 'count', 'Retry'
       Updater.count.className = null
       Updater.update()

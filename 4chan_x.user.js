@@ -3017,7 +3017,6 @@
       this.count = $('#count', dialog);
       this.timer = $('#timer', dialog);
       this.thread = $.id("t" + g.THREAD_ID);
-      this.unsuccessfulFetchCount = 0;
       this.lastModified = '0';
       _ref = $$('input', dialog);
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
@@ -3056,7 +3055,6 @@
         if (!Conf['Auto Update This']) {
           return;
         }
-        Updater.unsuccessfulFetchCount = 0;
         return setTimeout(Updater.update, 500);
       },
       visibility: function() {
@@ -3065,7 +3063,6 @@
         if (state !== 'visible') {
           return;
         }
-        Updater.unsuccessfulFetchCount = 0;
         if (Updater.timer.textContent < -Conf['Interval']) {
           return Updater.set('timer', -Conf['Interval']);
         }
@@ -3125,8 +3122,7 @@
                       This saves bandwidth for both the user and the servers and avoid unnecessary computation.
             */
 
-            Updater.unsuccessfulFetchCount++;
-            Updater.set('timer', -Updater.getInterval());
+            Updater.set('timer', -Conf['Interval']);
             if (Conf['Verbose']) {
               Updater.set('count', '+0');
               Updater.count.className = null;
@@ -3135,11 +3131,10 @@
           case 200:
             Updater.lastModified = this.getResponseHeader('Last-Modified');
             Updater.cb.update(JSON.parse(this.response).posts);
-            Updater.set('timer', -Updater.getInterval());
+            Updater.set('timer', -Conf['Interval']);
             break;
           default:
-            Updater.unsuccessfulFetchCount++;
-            Updater.set('timer', -Updater.getInterval());
+            Updater.set('timer', -Conf['Interval']);
             if (Conf['Verbose']) {
               Updater.set('count', this.statusText);
               Updater.count.className = 'warning';
@@ -3168,12 +3163,6 @@
           Updater.set('count', "+" + count);
           Updater.count.className = count ? 'new' : null;
         }
-        if (count) {
-          Updater.unsuccessfulFetchCount = 0;
-        } else {
-          Updater.unsuccessfulFetchCount++;
-          return;
-        }
         scroll = Conf['Scrolling'] && Updater.scrollBG() && lastPost.getBoundingClientRect().bottom - d.documentElement.clientHeight < 25;
         $.add(Updater.thread, nodes.reverse());
         if (scroll) {
@@ -3197,7 +3186,6 @@
       if (n === 0) {
         return Updater.update();
       } else if (n >= Conf['Interval']) {
-        Updater.unsuccessfulFetchCount++;
         Updater.set('count', 'Retry');
         Updater.count.className = null;
         return Updater.update();
