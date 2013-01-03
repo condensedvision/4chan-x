@@ -1,8 +1,8 @@
 Config =
   main:
     Enhancing:
-      'Disable 4chan\'s extension':   [true,  'Avoid conflicts between 4chan X and 4chan\'s inline extension.']
-      'Catalog Links':                [true,  'Turn Navigation links into links to each board\'s catalog.']
+      'Disable 4chan\'s extension':   [true,  'Avoid conflicts between 4chan X and 4chan\'s inline extension']
+      'Catalog Links':                [true,  'Turn Navigation links into links to each board\'s catalog']
       '404 Redirect':                 [true,  'Redirect dead threads and images']
       'Keybinds':                     [true,  'Binds actions to keys']
       'Time Formatting':              [true,  'Arbitrarily formatted timestamps, using your local time']
@@ -26,13 +26,13 @@ Config =
       'Image Hover':                  [false, 'Show full image on mouseover']
       'Sauce':                        [true,  'Add sauce to images']
       'Reveal Spoilers':              [false, 'Replace spoiler thumbnails by the original thumbnail']
-      'Expand From Current':          [false, 'Expand images from current position to thread end.']
+      'Expand From Current':          [false, 'Expand images from current position to thread end']
     Menu:
-      'Menu':                         [true,  'Add a drop-down menu in posts.']
-      'Report Link':                  [true,  'Add a report link to the menu.']
-      'Delete Link':                  [true,  'Add post and image deletion links to the menu.']
-      'Download Link':                [true,  'Add a download with original filename link to the menu. Chrome-only currently.']
-      'Archive Link':                 [true,  'Add an archive link to the menu.']
+      'Menu':                         [true,  'Add a drop-down menu in posts']
+      'Report Link':                  [true,  'Add a report link to the menu']
+      'Delete Link':                  [true,  'Add post and image deletion links to the menu']
+      'Download Link':                [true,  'Add a download with original filename link to the menu (Chrome only)']
+      'Archive Link':                 [true,  'Add an archive link to the menu']
     Monitoring:
       'Thread Updater':               [true,  'Update threads. Has more options in its own dialog.']
       'Unread Count':                 [true,  'Show unread post count in tab title']
@@ -43,15 +43,15 @@ Config =
       'Auto Watch':                   [true,  'Automatically watch threads that you start']
       'Auto Watch Reply':             [false, 'Automatically watch threads that you reply to']
     Posting:
-      'Quick Reply':                  [true,  'Reply without leaving the page.']
-      'Cooldown':                     [true,  'Prevent "flood detected" errors.']
-      'Persistent QR':                [false, 'The Quick reply won\'t disappear after posting.']
-      'Auto Hide QR':                 [true,  'Automatically hide the quick reply when posting.']
-      'Open Reply in New Tab':        [false, 'Open replies in a new tab that are made from the main board.']
-      'Remember QR size':             [false, 'Remember the size of the Quick reply (Firefox only).']
-      'Remember Subject':             [false, 'Remember the subject field, instead of resetting after posting.']
-      'Remember Spoiler':             [false, 'Remember the spoiler state, instead of resetting after posting.']
-      'Hide Original Post Form':      [true,  'Replace the normal post form with a shortcut to open the QR.']
+      'Quick Reply':                  [true,  'Reply without leaving the page']
+      'Cooldown':                     [true,  'Prevent "flood detected" errors']
+      'Persistent QR':                [false, 'The Quick reply won\'t disappear after posting']
+      'Auto Hide QR':                 [true,  'Automatically hide the quick reply when posting']
+      'Open Reply in New Tab':        [false, 'Open replies in a new tab that are made from the main board']
+      'Remember QR size':             [false, 'Remember the size of the Quick reply (Firefox only)']
+      'Remember Subject':             [false, 'Remember the subject field, instead of resetting after posting']
+      'Remember Spoiler':             [false, 'Remember the spoiler state, instead of resetting after posting']
+      'Hide Original Post Form':      [true,  'Replace the normal post form with a shortcut to open the QR']
     Quoting:
       'Quote Backlinks':              [true,  'Add quote backlinks']
       'OP Backlinks':                 [false, 'Add backlinks to the OP']
@@ -160,6 +160,7 @@ Config =
     hide:            ['x',      'Hide thread']
   updater:
     checkbox:
+      'Beep':        [false, 'Beep on new post to completely read thread']
       'Scrolling':   [false, 'Scroll updated posts into view. Only enabled at bottom of page.']
       'Scroll BG':   [false, 'Scroll background tabs']
       'Verbose':     [true,  'Show countdown timer, new post count']
@@ -394,6 +395,8 @@ $.extend $,
         # Round to an integer otherwise.
         Math.round size
     "#{size} #{['B', 'KB', 'MB', 'GB'][unit]}"
+  hidden: ->
+    d.hidden or d.oHidden or d.mozHidden or d.webkitHidden
 
 $.cache.requests = {}
 
@@ -848,7 +851,7 @@ ThreadHiding =
 
   sync: ->
     hiddenThreads = $.get "hiddenThreads/#{g.BOARD}/", {}
-    hiddenThreadsCatalog = JSON.parse localStorage.getItem "4chan-hide-t-#{g.BOARD}"
+    hiddenThreadsCatalog = JSON.parse(localStorage.getItem "4chan-hide-t-#{g.BOARD}") or {}
     if g.CATALOG
       for id of hiddenThreads
         hiddenThreadsCatalog[id] = true
@@ -1414,10 +1417,10 @@ QR =
       el.innerHTML = null
       $.add el, err
     QR.open()
-    if QR.captchaIsEnabled and /captcha|verification/i.test el.textContent
+    if QR.captcha.isEnabled and /captcha|verification/i.test el.textContent
       # Focus the captcha input on captcha error.
       $('[autocomplete]', QR.el).focus()
-    alert el.textContent if d.hidden or d.oHidden or d.mozHidden or d.webkitHidden
+    alert el.textContent if $.hidden()
   cleanError: ->
     $('.warning', QR.el).textContent = null
 
@@ -1621,20 +1624,7 @@ QR =
     $.addClass QR.el, 'dump'
     QR.resetFileInput() # reset input
   resetFileInput: ->
-    input = $ '[type=file]', QR.el
-    input.value = null
-    return unless $.engine is 'presto'
-    # XXX Opera needs extra care to reset its file input's value
-    clone = $.el 'input',
-      type: 'file'
-      accept:   input.accept
-      max:      input.max
-      multiple: input.multiple
-      size:     input.size
-      title:    input.title
-    $.on clone, 'change', QR.fileInput
-    $.on clone, 'click',  (e) -> if e.shiftKey then QR.selected.rmFile() or e.preventDefault()
-    $.replace input, clone
+    $('[type=file]', QR.el).value = null
 
   replies: []
   reply: class
@@ -1678,9 +1668,9 @@ QR =
       unless /^image/.test file.type
         @el.style.backgroundImage = null
         return
-      url = window.URL or window.webkitURL
-      # XXX Opera does not support window.URL.revokeObjectURL
-      url.revokeObjectURL? @url
+      # XXX Opera does not support window.URL
+      return unless url = window.URL or window.webkitURL
+      url.revokeObjectURL @url
 
       # Create a redimensioned thumbnail.
       fileUrl = url.createObjectURL file
@@ -1778,7 +1768,7 @@ QR =
   captcha:
     init: ->
       return if -1 isnt d.cookie.indexOf 'pass_enabled='
-      return unless QR.captchaIsEnabled = !!$.id 'captchaFormPart'
+      return unless @isEnabled = !!$.id 'captchaFormPart'
       if $.id 'recaptcha_challenge_field_holder'
         @ready()
       else
@@ -1973,7 +1963,7 @@ QR =
     else unless reply.com or reply.file
         err = 'No file selected.'
 
-    if QR.captchaIsEnabled and !err
+    if QR.captcha.isEnabled and !err
       # get oldest valid captcha
       captchas = $.get 'captchas', []
       # remove old captchas
@@ -2075,13 +2065,17 @@ QR =
       if /captcha|verification/i.test(err.textContent) or err is 'Connection error with sys.4chan.org.'
         # Remove the obnoxious 4chan Pass ad.
         if /mistyped/i.test err.textContent
-          err.textContent = 'Error: You seem to have mistyped the CAPTCHA.'
+          err = 'Error: You seem to have mistyped the CAPTCHA.'
         # Enable auto-post if we have some cached captchas.
         QR.cooldown.auto =
-          if QR.captchaIsEnabled
+          if QR.captcha.isEnabled
             !!$.get('captchas', []).length
-          else
+          else if err is 'Connection error with sys.4chan.org.'
             true
+          else
+            # Something must've gone terribly wrong if you get captcha errors without captchas.
+            # Don't auto-post indefinitely in that case.
+            false
         # Too many frequent mistyped captchas will auto-ban you!
         # On connection error, the post most likely didn't go through.
         QR.cooldown.set delay: 2
@@ -2463,13 +2457,18 @@ Updater =
     $.on d, 'QRPostSuccessful', @cb.post
     $.on d, 'visibilitychange ovisibilitychange mozvisibilitychange webkitvisibilitychange', @cb.visibility
 
+  ###
+  http://freesound.org/people/pierrecartoons1979/sounds/90112/
+  cc-by-nc-3.0
+  ###
+  audio: $.el('audio', src: 'data:audio/wav;base64,UklGRjQDAABXQVZFZm10IBAAAAABAAEAgD4AAIA+AAABAAgAc21wbDwAAABBAAADAAAAAAAAAAA8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABkYXRhzAIAAGMms8em0tleMV4zIpLVo8nhfSlcPR102Ki+5JspVEkdVtKzs+K1NEhUIT7DwKrcy0g6WygsrM2k1NpiLl0zIY/WpMrjgCdbPhxw2Kq+5Z4qUkkdU9K1s+K5NkVTITzBwqnczko3WikrqM+l1NxlLF0zIIvXpsnjgydZPhxs2ay95aIrUEkdUdC3suK8N0NUIjq+xKrcz002WioppdGm091pK1w0IIjYp8jkhydXPxxq2K295aUrTkoeTs65suK+OUFUIzi7xqrb0VA0WSoootKm0t5tKlo1H4TYqMfkiydWQBxm16+85actTEseS8y7seHAPD9TIza5yKra01QyWSson9On0d5wKVk2H4DYqcfkjidUQB1j1rG75KsvSkseScu8seDCPz1TJDW2yara1FYxWSwnm9Sn0N9zKVg2H33ZqsXkkihSQR1g1bK65K0wSEsfR8i+seDEQTxUJTOzy6rY1VowWC0mmNWoz993KVc3H3rYq8TklSlRQh1d1LS647AyR0wgRMbAsN/GRDpTJTKwzKrX1l4vVy4lldWpzt97KVY4IXbUr8LZljVPRCxhw7W3z6ZISkw1VK+4sMWvXEhSPk6buay9sm5JVkZNiLWqtrJ+TldNTnquqbCwilZXU1BwpKirrpNgWFhTaZmnpquZbFlbVmWOpaOonHZcXlljhaGhpZ1+YWBdYn2cn6GdhmdhYGN3lp2enIttY2Jjco+bnJuOdGZlZXCImJqakHpoZ2Zug5WYmZJ/bGlobX6RlpeSg3BqaW16jZSVkoZ0bGtteImSk5KIeG5tbnaFkJKRinxxbm91gY2QkIt/c3BwdH6Kj4+LgnZxcXR8iI2OjIR5c3J0e4WLjYuFe3VzdHmCioyLhn52dHR5gIiKioeAeHV1eH+GiYqHgXp2dnh9hIiJh4J8eHd4fIKHiIeDfXl4eHyBhoeHhH96eHmA')
+
   cb:
     post: ->
       return unless Conf['Auto Update This']
       setTimeout Updater.update, 500
     visibility: ->
-      state = d.visibilityState or d.oVisibilityState or d.mozVisibilityState or d.webkitVisibilityState
-      return if state isnt 'visible'
+      return if $.hidden()
       # Reset the counter when we focus this tab.
       if Updater.timer.textContent < -Conf['Interval']
         Updater.set 'timer', -Conf['Interval']
@@ -2496,7 +2495,7 @@ Updater =
         if @checked
           -> true
         else
-          -> !(d.hidden or d.oHidden or d.mozHidden or d.webkitHidden)
+          -> ! $.hidden()
     load: ->
       switch @status
         when 404
@@ -2548,6 +2547,9 @@ Updater =
       if Conf['Verbose']
         Updater.set 'count', "+#{count}"
         Updater.count.className = if count then 'new' else null
+
+      if count and Conf['Beep'] and $.hidden() and Unread.replies.length is 0)
+        Updater.audio.play()
 
       scroll = Conf['Scrolling'] and Updater.scrollBG() and
         lastPost.getBoundingClientRect().bottom - d.documentElement.clientHeight < 25
@@ -2955,7 +2957,7 @@ Get =
           when '[/banned]'
             '</b>'
     # greentext
-    comment = bq.innerHTML.replace /(^|>)(&gt;[^<$]+)(<|$)/g, '$1<span class=quote>$2</span>$3'
+    comment = bq.innerHTML.replace /(^|>)(&gt;[^<$]*)(<|$)/g, '$1<span class=quote>$2</span>$3'
 
     o =
       # id
@@ -2970,7 +2972,7 @@ Get =
         when 'D' then 'developer'
       tripcode: data.trip
       uniqueID: data.poster_hash
-      email:    if data.email then encodeURIComponent data.email else ''
+      email:    if data.email then encodeURI data.email else ''
       subject:  data.title_processed
       flagCode: data.poster_country
       flagName: data.poster_country_name_processed
@@ -3051,7 +3053,7 @@ Build =
       capcode:  data.capcode
       tripcode: data.trip
       uniqueID: data.id
-      email:    if data.email then encodeURIComponent data.email.replace /&quot;/g, '"' else ''
+      email:    if data.email then encodeURI data.email.replace /&quot;/g, '"' else ''
       subject:  data.sub
       flagCode: data.country
       flagName: data.country_name
@@ -4524,7 +4526,7 @@ Main =
     $.globalEval "(#{code})()".replace '_id_', bq.id
 
   namespace: '4chan_x.'
-  version: '2.37.0'
+  version: '2.37.1'
   callbacks: []
   css: '
 /* dialog styling */

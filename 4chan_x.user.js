@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.37.0
+// @version        2.37.1
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -27,7 +27,7 @@
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012 Nicolas Stepien <stepien.nicolas@gmail.com>
  * http://mayhemydg.github.com/4chan-x/
- * 4chan X 2.37.0
+ * 4chan X 2.37.1
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -86,8 +86,8 @@
   Config = {
     main: {
       Enhancing: {
-        'Disable 4chan\'s extension': [true, 'Avoid conflicts between 4chan X and 4chan\'s inline extension.'],
-        'Catalog Links': [true, 'Turn Navigation links into links to each board\'s catalog.'],
+        'Disable 4chan\'s extension': [true, 'Avoid conflicts between 4chan X and 4chan\'s inline extension'],
+        'Catalog Links': [true, 'Turn Navigation links into links to each board\'s catalog'],
         '404 Redirect': [true, 'Redirect dead threads and images'],
         'Keybinds': [true, 'Binds actions to keys'],
         'Time Formatting': [true, 'Arbitrarily formatted timestamps, using your local time'],
@@ -113,14 +113,14 @@
         'Image Hover': [false, 'Show full image on mouseover'],
         'Sauce': [true, 'Add sauce to images'],
         'Reveal Spoilers': [false, 'Replace spoiler thumbnails by the original thumbnail'],
-        'Expand From Current': [false, 'Expand images from current position to thread end.']
+        'Expand From Current': [false, 'Expand images from current position to thread end']
       },
       Menu: {
-        'Menu': [true, 'Add a drop-down menu in posts.'],
-        'Report Link': [true, 'Add a report link to the menu.'],
-        'Delete Link': [true, 'Add post and image deletion links to the menu.'],
-        'Download Link': [true, 'Add a download with original filename link to the menu. Chrome-only currently.'],
-        'Archive Link': [true, 'Add an archive link to the menu.']
+        'Menu': [true, 'Add a drop-down menu in posts'],
+        'Report Link': [true, 'Add a report link to the menu'],
+        'Delete Link': [true, 'Add post and image deletion links to the menu'],
+        'Download Link': [true, 'Add a download with original filename link to the menu (Chrome only)'],
+        'Archive Link': [true, 'Add an archive link to the menu']
       },
       Monitoring: {
         'Thread Updater': [true, 'Update threads. Has more options in its own dialog.'],
@@ -133,15 +133,15 @@
         'Auto Watch Reply': [false, 'Automatically watch threads that you reply to']
       },
       Posting: {
-        'Quick Reply': [true, 'Reply without leaving the page.'],
-        'Cooldown': [true, 'Prevent "flood detected" errors.'],
-        'Persistent QR': [false, 'The Quick reply won\'t disappear after posting.'],
-        'Auto Hide QR': [true, 'Automatically hide the quick reply when posting.'],
-        'Open Reply in New Tab': [false, 'Open replies in a new tab that are made from the main board.'],
-        'Remember QR size': [false, 'Remember the size of the Quick reply (Firefox only).'],
-        'Remember Subject': [false, 'Remember the subject field, instead of resetting after posting.'],
-        'Remember Spoiler': [false, 'Remember the spoiler state, instead of resetting after posting.'],
-        'Hide Original Post Form': [true, 'Replace the normal post form with a shortcut to open the QR.']
+        'Quick Reply': [true, 'Reply without leaving the page'],
+        'Cooldown': [true, 'Prevent "flood detected" errors'],
+        'Persistent QR': [false, 'The Quick reply won\'t disappear after posting'],
+        'Auto Hide QR': [true, 'Automatically hide the quick reply when posting'],
+        'Open Reply in New Tab': [false, 'Open replies in a new tab that are made from the main board'],
+        'Remember QR size': [false, 'Remember the size of the Quick reply (Firefox only)'],
+        'Remember Subject': [false, 'Remember the subject field, instead of resetting after posting'],
+        'Remember Spoiler': [false, 'Remember the spoiler state, instead of resetting after posting'],
+        'Hide Original Post Form': [true, 'Replace the normal post form with a shortcut to open the QR']
       },
       Quoting: {
         'Quote Backlinks': [true, 'Add quote backlinks'],
@@ -201,6 +201,7 @@
     },
     updater: {
       checkbox: {
+        'Beep': [false, 'Beep on new post to completely read thread'],
         'Scrolling': [false, 'Scroll updated posts into view. Only enabled at bottom of page.'],
         'Scroll BG': [false, 'Scroll background tabs'],
         'Verbose': [true, 'Show countdown timer, new post count'],
@@ -514,6 +515,9 @@
       }
       size = unit > 1 ? Math.round(size * 100) / 100 : Math.round(size);
       return "" + size + " " + ['B', 'KB', 'MB', 'GB'][unit];
+    },
+    hidden: function() {
+      return d.hidden || d.oHidden || d.mozHidden || d.webkitHidden;
     }
   });
 
@@ -1067,7 +1071,7 @@
     sync: function() {
       var hiddenThreads, hiddenThreadsCatalog, id;
       hiddenThreads = $.get("hiddenThreads/" + g.BOARD + "/", {});
-      hiddenThreadsCatalog = JSON.parse(localStorage.getItem("4chan-hide-t-" + g.BOARD));
+      hiddenThreadsCatalog = JSON.parse(localStorage.getItem("4chan-hide-t-" + g.BOARD)) || {};
       if (g.CATALOG) {
         for (id in hiddenThreads) {
           hiddenThreadsCatalog[id] = true;
@@ -1834,10 +1838,10 @@
         $.add(el, err);
       }
       QR.open();
-      if (QR.captchaIsEnabled && /captcha|verification/i.test(el.textContent)) {
+      if (QR.captcha.isEnabled && /captcha|verification/i.test(el.textContent)) {
         $('[autocomplete]', QR.el).focus();
       }
-      if (d.hidden || d.oHidden || d.mozHidden || d.webkitHidden) {
+      if ($.hidden()) {
         return alert(el.textContent);
       }
     },
@@ -2070,27 +2074,7 @@
       return QR.resetFileInput();
     },
     resetFileInput: function() {
-      var clone, input;
-      input = $('[type=file]', QR.el);
-      input.value = null;
-      if ($.engine !== 'presto') {
-        return;
-      }
-      clone = $.el('input', {
-        type: 'file',
-        accept: input.accept,
-        max: input.max,
-        multiple: input.multiple,
-        size: input.size,
-        title: input.title
-      });
-      $.on(clone, 'change', QR.fileInput);
-      $.on(clone, 'click', function(e) {
-        if (e.shiftKey) {
-          return QR.selected.rmFile() || e.preventDefault();
-        }
-      });
-      return $.replace(input, clone);
+      return $('[type=file]', QR.el).value = null;
     },
     replies: [],
     reply: (function() {
@@ -2150,10 +2134,10 @@
           this.el.style.backgroundImage = null;
           return;
         }
-        url = window.URL || window.webkitURL;
-        if (typeof url.revokeObjectURL === "function") {
-          url.revokeObjectURL(this.url);
+        if (!(url = window.URL || window.webkitURL)) {
+          return;
         }
+        url.revokeObjectURL(this.url);
         fileUrl = url.createObjectURL(file);
         img = $.el('img');
         $.on(img, 'load', function() {
@@ -2286,7 +2270,7 @@
         if (-1 !== d.cookie.indexOf('pass_enabled=')) {
           return;
         }
-        if (!(QR.captchaIsEnabled = !!$.id('captchaFormPart'))) {
+        if (!(this.isEnabled = !!$.id('captchaFormPart'))) {
           return;
         }
         if ($.id('recaptcha_challenge_field_holder')) {
@@ -2523,7 +2507,7 @@
       } else if (!(reply.com || reply.file)) {
         err = 'No file selected.';
       }
-      if (QR.captchaIsEnabled && !err) {
+      if (QR.captcha.isEnabled && !err) {
         captchas = $.get('captchas', []);
         while ((captcha = captchas[0]) && captcha.time < Date.now()) {
           captchas.shift();
@@ -2630,9 +2614,9 @@
       if (err) {
         if (/captcha|verification/i.test(err.textContent) || err === 'Connection error with sys.4chan.org.') {
           if (/mistyped/i.test(err.textContent)) {
-            err.textContent = 'Error: You seem to have mistyped the CAPTCHA.';
+            err = 'Error: You seem to have mistyped the CAPTCHA.';
           }
-          QR.cooldown.auto = QR.captchaIsEnabled ? !!$.get('captchas', []).length : true;
+          QR.cooldown.auto = QR.captcha.isEnabled ? !!$.get('captchas', []).length : err === 'Connection error with sys.4chan.org.' ? true : false;
           QR.cooldown.set({
             delay: 2
           });
@@ -3050,6 +3034,14 @@
       $.on(d, 'QRPostSuccessful', this.cb.post);
       return $.on(d, 'visibilitychange ovisibilitychange mozvisibilitychange webkitvisibilitychange', this.cb.visibility);
     },
+    /*
+      http://freesound.org/people/pierrecartoons1979/sounds/90112/
+      cc-by-nc-3.0
+    */
+
+    audio: $.el('audio', {
+      src: 'data:audio/wav;base64,UklGRjQDAABXQVZFZm10IBAAAAABAAEAgD4AAIA+AAABAAgAc21wbDwAAABBAAADAAAAAAAAAAA8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABkYXRhzAIAAGMms8em0tleMV4zIpLVo8nhfSlcPR102Ki+5JspVEkdVtKzs+K1NEhUIT7DwKrcy0g6WygsrM2k1NpiLl0zIY/WpMrjgCdbPhxw2Kq+5Z4qUkkdU9K1s+K5NkVTITzBwqnczko3WikrqM+l1NxlLF0zIIvXpsnjgydZPhxs2ay95aIrUEkdUdC3suK8N0NUIjq+xKrcz002WioppdGm091pK1w0IIjYp8jkhydXPxxq2K295aUrTkoeTs65suK+OUFUIzi7xqrb0VA0WSoootKm0t5tKlo1H4TYqMfkiydWQBxm16+85actTEseS8y7seHAPD9TIza5yKra01QyWSson9On0d5wKVk2H4DYqcfkjidUQB1j1rG75KsvSkseScu8seDCPz1TJDW2yara1FYxWSwnm9Sn0N9zKVg2H33ZqsXkkihSQR1g1bK65K0wSEsfR8i+seDEQTxUJTOzy6rY1VowWC0mmNWoz993KVc3H3rYq8TklSlRQh1d1LS647AyR0wgRMbAsN/GRDpTJTKwzKrX1l4vVy4lldWpzt97KVY4IXbUr8LZljVPRCxhw7W3z6ZISkw1VK+4sMWvXEhSPk6buay9sm5JVkZNiLWqtrJ+TldNTnquqbCwilZXU1BwpKirrpNgWFhTaZmnpquZbFlbVmWOpaOonHZcXlljhaGhpZ1+YWBdYn2cn6GdhmdhYGN3lp2enIttY2Jjco+bnJuOdGZlZXCImJqakHpoZ2Zug5WYmZJ/bGlobX6RlpeSg3BqaW16jZSVkoZ0bGtteImSk5KIeG5tbnaFkJKRinxxbm91gY2QkIt/c3BwdH6Kj4+LgnZxcXR8iI2OjIR5c3J0e4WLjYuFe3VzdHmCioyLhn52dHR5gIiKioeAeHV1eH+GiYqHgXp2dnh9hIiJh4J8eHd4fIKHiIeDfXl4eHyBhoeHhH96eHmA'
+    }),
     cb: {
       post: function() {
         if (!Conf['Auto Update This']) {
@@ -3058,9 +3050,7 @@
         return setTimeout(Updater.update, 500);
       },
       visibility: function() {
-        var state;
-        state = d.visibilityState || d.oVisibilityState || d.mozVisibilityState || d.webkitVisibilityState;
-        if (state !== 'visible') {
+        if ($.hidden()) {
           return;
         }
         if (Updater.timer.textContent < -Conf['Interval']) {
@@ -3095,7 +3085,7 @@
         return Updater.scrollBG = this.checked ? function() {
           return true;
         } : function() {
-          return !(d.hidden || d.oHidden || d.mozHidden || d.webkitHidden);
+          return !$.hidden();
         };
       },
       load: function() {
@@ -3731,7 +3721,7 @@
             return '</b>';
         }
       });
-      comment = bq.innerHTML.replace(/(^|>)(&gt;[^<$]+)(<|$)/g, '$1<span class=quote>$2</span>$3');
+      comment = bq.innerHTML.replace(/(^|>)(&gt;[^<$]*)(<|$)/g, '$1<span class=quote>$2</span>$3');
       o = {
         postID: postID,
         threadID: data.thread_num,
@@ -3749,7 +3739,7 @@
         })(),
         tripcode: data.trip,
         uniqueID: data.poster_hash,
-        email: data.email ? encodeURIComponent(data.email) : '',
+        email: data.email ? encodeURI(data.email) : '',
         subject: data.title_processed,
         flagCode: data.poster_country,
         flagName: data.poster_country_name_processed,
@@ -3849,7 +3839,7 @@
         capcode: data.capcode,
         tripcode: data.trip,
         uniqueID: data.id,
-        email: data.email ? encodeURIComponent(data.email.replace(/&quot;/g, '"')) : '',
+        email: data.email ? encodeURI(data.email.replace(/&quot;/g, '"')) : '',
         subject: data.sub,
         flagCode: data.country,
         flagName: data.country_name,
@@ -5627,7 +5617,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.37.0',
+    version: '2.37.1',
     callbacks: [],
     css: '\
 /* dialog styling */\
