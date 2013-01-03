@@ -2548,7 +2548,7 @@ Updater =
         Updater.set 'count', "+#{count}"
         Updater.count.className = if count then 'new' else null
 
-      if count and Conf['Beep'] and $.hidden() and Unread.replies.length is 0)
+      if count and Conf['Beep'] and $.hidden() and Unread.replies.length is 0
         Updater.audio.play()
 
       scroll = Conf['Scrolling'] and Updater.scrollBG() and

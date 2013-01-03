@@ -3153,6 +3153,9 @@
           Updater.set('count', "+" + count);
           Updater.count.className = count ? 'new' : null;
         }
+        if (count && Conf['Beep'] && $.hidden() && Unread.replies.length === 0) {
+          Updater.audio.play();
+        }
         scroll = Conf['Scrolling'] && Updater.scrollBG() && lastPost.getBoundingClientRect().bottom - d.documentElement.clientHeight < 25;
         $.add(Updater.thread, nodes.reverse());
         if (scroll) {
