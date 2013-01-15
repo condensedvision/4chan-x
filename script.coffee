@@ -707,7 +707,7 @@ StrikethroughQuotes =
   node: (post) ->
     return if post.isInlined
     for quote in post.quotes
-      continue unless (el = $.id quote.hash[1..]) and !/catalog$/.test(quote.pathname) and el.hidden
+      continue unless (el = $.id quote.hash[1..]) and quote.hostname is 'boards.4chan.org' and !/catalog$/.test(quote.pathname) and el.hidden
       $.addClass quote, 'filtered'
       if Conf['Recursive Filtering'] and post.ID isnt post.threadID
         show_stub = !!$.x 'preceding-sibling::div[contains(@class,"stub")]', el
@@ -1548,7 +1548,8 @@ QR =
   quote: (e) ->
     e?.preventDefault()
     QR.open()
-    unless g.REPLY
+    ta = $ 'textarea', QR.el
+    unless g.REPLY or ta.value
       QR.threadSelector.value = $.x('ancestor::div[parent::div[@class="board"]]', @).id[1..]
     # Make sure we get the correct number, even with XXX censors
     id   = @previousSibling.hash[2..]
@@ -1560,7 +1561,6 @@ QR =
       s = s.replace /\n/g, '\n>'
       text += ">#{s}\n"
 
-    ta = $ 'textarea', QR.el
     caretPos = ta.selectionStart
     # Replace selection for text.
     ta.value = ta.value[...caretPos] + text + ta.value[ta.selectionEnd..]
@@ -2058,7 +2058,7 @@ QR =
           "Reason: #{$('.reason', doc).innerHTML}"
     else if err = doc.getElementById 'errmsg' # error!
       $('a', err)?.target = '_blank' # duplicate image link
-    else unless msg = $ 'b', doc
+    else if doc.title isnt 'Post successful!'
       err = 'Connection error with sys.4chan.org.'
 
     if err
@@ -2094,7 +2094,7 @@ QR =
       sub:   if Conf['Remember Subject']  then reply.sub     else null
     $.set 'QR.persona', persona
 
-    [_, threadID, postID] = msg.lastChild.textContent.match /thread:(\d+),no:(\d+)/
+    [_, threadID, postID] = doc.body.lastChild.textContent.match /thread:(\d+),no:(\d+)/
 
     # Post/upload confirmed as successful.
     $.event QR.el, new CustomEvent 'QRPostSuccessful',
@@ -2958,6 +2958,8 @@ Get =
             '</b>'
     # greentext
     comment = bq.innerHTML.replace /(^|>)(&gt;[^<$]*)(<|$)/g, '$1<span class=quote>$2</span>$3'
+    # quotes
+    comment = comment.replace /((&gt;){2}(&gt;\/[a-z\d]+\/)?\d+)/g, '<span class=deadlink>$1</span>'
 
     o =
       # id
@@ -3299,7 +3301,7 @@ QuoteBacklink =
       # Stop at 'Admin/Mod/Dev Replies:' on /q/
       break if quote.parentNode.parentNode.className is 'capcodeReplies'
       # Don't process >>>/b/.
-      if !/catalog$/.test(quote.pathname) and qid = quote.hash[2..]
+      if quote.hostname is 'boards.4chan.org' and !/catalog$/.test(quote.pathname) and qid = quote.hash[2..]
         # Duplicate quotes get overwritten.
         quotes[qid] = true
     a = $.el 'a',
@@ -3327,7 +3329,7 @@ QuoteInline =
     Main.callbacks.push @node
   node: (post) ->
     for quote in post.quotes
-      continue unless quote.hash and !/catalog$/.test(quote.pathname) or /\bdeadlink\b/.test quote.className
+      continue unless quote.hash and quote.hostname is 'boards.4chan.org' and !/catalog$/.test(quote.pathname) or /\bdeadlink\b/.test quote.className
       $.on quote, 'click', QuoteInline.toggle
     for quote in post.backlinks
       $.on quote, 'click', QuoteInline.toggle
@@ -3396,7 +3398,7 @@ QuotePreview =
     Main.callbacks.push @node
   node: (post) ->
     for quote in post.quotes
-      continue unless quote.hash and !/catalog$/.test(quote.pathname) or /\bdeadlink\b/.test quote.className
+      continue unless quote.hash and quote.hostname is 'boards.4chan.org' and !/catalog$/.test(quote.pathname) or /\bdeadlink\b/.test quote.className
       $.on quote, 'mouseover', QuotePreview.mouseover
     for quote in post.backlinks
       $.on quote, 'mouseover', QuotePreview.mouseover
@@ -3492,7 +3494,7 @@ QuoteCT =
   node: (post) ->
     return if post.isInlined and not post.isCrosspost
     for quote in post.quotes
-      unless quote.hash and !/catalog$/.test quote.pathname
+      unless quote.hash and quote.hostname is 'boards.4chan.org' and !/catalog$/.test quote.pathname
         # Make sure this isn't a link to the board we're on.
         continue
       path = quote.pathname.split '/'
@@ -3906,6 +3908,8 @@ Redirect =
         "//archive.foolz.us/#{board}/full_image/#{filename}"
       when 'u'
         "//nsfw.foolz.us/#{board}/full_image/#{filename}"
+      when 'po'
+        "http://archive.thedarkcave.org/#{board}/full_image/#{filename}"
       when 'ck', 'lit'
         "//fuuka.warosu.org/#{board}/full_image/#{filename}"
       when 'cgl', 'g', 'mu', 'w'
@@ -3920,6 +3924,8 @@ Redirect =
         "//archive.foolz.us/api/chan/post/board/#{board}/num/#{postID}/format/json"
       when 'u', 'kuku'
         "//nsfw.foolz.us/_/api/chan/post/?board=#{board}&num=#{postID}"
+      when 'po'
+        "http://archive.thedarkcave.org/_/api/chan/post/?board=#{board}&num=#{postID}"
   to: (data) ->
     unless data.isSearch
       {threadID} = data
@@ -3929,6 +3935,8 @@ Redirect =
         url = Redirect.path '//archive.foolz.us', 'foolfuuka', data
       when 'u', 'kuku'
         url = Redirect.path '//nsfw.foolz.us', 'foolfuuka', data
+      when 'po'
+        url = Redirect.path 'http://archive.thedarkcave.org', 'foolfuuka', data
       when 'ck', 'jp', 'lit'
         url = Redirect.path '//fuuka.warosu.org', 'fuuka', data
       when 'diy', 'sci'
@@ -4526,7 +4534,7 @@ Main =
     $.globalEval "(#{code})()".replace '_id_', bq.id
 
   namespace: '4chan_x.'
-  version: '2.37.1'
+  version: '2.37.3'
   callbacks: []
   css: '
 /* dialog styling */

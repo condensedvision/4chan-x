@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.37.1
+// @version        2.37.3
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
-// @copyright      2012 Nicolas Stepien <stepien.nicolas@gmail.com>
+// @copyright      2012-2013 Nicolas Stepien <stepien.nicolas@gmail.com>
 // @license        MIT; http://en.wikipedia.org/wiki/Mit_license
 // @include        http://boards.4chan.org/*
 // @include        https://boards.4chan.org/*
@@ -27,7 +27,7 @@
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012 Nicolas Stepien <stepien.nicolas@gmail.com>
  * http://mayhemydg.github.com/4chan-x/
- * 4chan X 2.37.1
+ * 4chan X 2.37.3
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -860,7 +860,7 @@
       _ref = post.quotes;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         quote = _ref[_i];
-        if (!((el = $.id(quote.hash.slice(1))) && !/catalog$/.test(quote.pathname) && el.hidden)) {
+        if (!((el = $.id(quote.hash.slice(1))) && quote.hostname === 'boards.4chan.org' && !/catalog$/.test(quote.pathname) && el.hidden)) {
           continue;
         }
         $.addClass(quote, 'filtered');
@@ -1993,7 +1993,8 @@
         e.preventDefault();
       }
       QR.open();
-      if (!g.REPLY) {
+      ta = $('textarea', QR.el);
+      if (!(g.REPLY || ta.value)) {
         QR.threadSelector.value = $.x('ancestor::div[parent::div[@class="board"]]', this).id.slice(1);
       }
       id = this.previousSibling.hash.slice(2);
@@ -2003,7 +2004,6 @@
         s = s.replace(/\n/g, '\n>');
         text += ">" + s + "\n";
       }
-      ta = $('textarea', QR.el);
       caretPos = ta.selectionStart;
       ta.value = ta.value.slice(0, caretPos) + text + ta.value.slice(ta.selectionEnd);
       range = caretPos + text.length;
@@ -2596,7 +2596,7 @@
       return QR.ajax = $.ajax($.id('postForm').parentNode.action, callbacks, opts);
     },
     response: function(html) {
-      var ban, board, doc, err, msg, persona, postID, reply, threadID, _, _ref, _ref1;
+      var ban, board, doc, err, persona, postID, reply, threadID, _, _ref, _ref1;
       doc = d.implementation.createHTMLDocument('');
       doc.documentElement.innerHTML = html;
       if (ban = $('.banType', doc)) {
@@ -2608,7 +2608,7 @@
         if ((_ref = $('a', err)) != null) {
           _ref.target = '_blank';
         }
-      } else if (!(msg = $('b', doc))) {
+      } else if (doc.title !== 'Post successful!') {
         err = 'Connection error with sys.4chan.org.';
       }
       if (err) {
@@ -2635,7 +2635,7 @@
         sub: Conf['Remember Subject'] ? reply.sub : null
       };
       $.set('QR.persona', persona);
-      _ref1 = msg.lastChild.textContent.match(/thread:(\d+),no:(\d+)/), _ = _ref1[0], threadID = _ref1[1], postID = _ref1[2];
+      _ref1 = doc.body.lastChild.textContent.match(/thread:(\d+),no:(\d+)/), _ = _ref1[0], threadID = _ref1[1], postID = _ref1[2];
       $.event(QR.el, new CustomEvent('QRPostSuccessful', {
         bubbles: true,
         detail: {
@@ -3725,6 +3725,7 @@
         }
       });
       comment = bq.innerHTML.replace(/(^|>)(&gt;[^<$]*)(<|$)/g, '$1<span class=quote>$2</span>$3');
+      comment = comment.replace(/((&gt;){2}(&gt;\/[a-z\d]+\/)?\d+)/g, '<span class=deadlink>$1</span>');
       o = {
         postID: postID,
         threadID: data.thread_num,
@@ -3994,7 +3995,7 @@
         if (quote.parentNode.parentNode.className === 'capcodeReplies') {
           break;
         }
-        if (!/catalog$/.test(quote.pathname) && (qid = quote.hash.slice(2))) {
+        if (quote.hostname === 'boards.4chan.org' && !/catalog$/.test(quote.pathname) && (qid = quote.hash.slice(2))) {
           quotes[qid] = true;
         }
       }
@@ -4035,7 +4036,7 @@
       _ref = post.quotes;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         quote = _ref[_i];
-        if (!(quote.hash && !/catalog$/.test(quote.pathname) || /\bdeadlink\b/.test(quote.className))) {
+        if (!(quote.hash && quote.hostname === 'boards.4chan.org' && !/catalog$/.test(quote.pathname) || /\bdeadlink\b/.test(quote.className))) {
           continue;
         }
         $.on(quote, 'click', QuoteInline.toggle);
@@ -4128,7 +4129,7 @@
       _ref = post.quotes;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         quote = _ref[_i];
-        if (!(quote.hash && !/catalog$/.test(quote.pathname) || /\bdeadlink\b/.test(quote.className))) {
+        if (!(quote.hash && quote.hostname === 'boards.4chan.org' && !/catalog$/.test(quote.pathname) || /\bdeadlink\b/.test(quote.className))) {
           continue;
         }
         $.on(quote, 'mouseover', QuotePreview.mouseover);
@@ -4268,7 +4269,7 @@
       _ref = post.quotes;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         quote = _ref[_i];
-        if (!(quote.hash && !/catalog$/.test(quote.pathname))) {
+        if (!(quote.hash && quote.hostname === 'boards.4chan.org' && !/catalog$/.test(quote.pathname))) {
           continue;
         }
         path = quote.pathname.split('/');
@@ -4760,6 +4761,8 @@
           return "//archive.foolz.us/" + board + "/full_image/" + filename;
         case 'u':
           return "//nsfw.foolz.us/" + board + "/full_image/" + filename;
+        case 'po':
+          return "http://archive.thedarkcave.org/" + board + "/full_image/" + filename;
         case 'ck':
         case 'lit':
           return "//fuuka.warosu.org/" + board + "/full_image/" + filename;
@@ -4795,6 +4798,8 @@
         case 'u':
         case 'kuku':
           return "//nsfw.foolz.us/_/api/chan/post/?board=" + board + "&num=" + postID;
+        case 'po':
+          return "http://archive.thedarkcave.org/_/api/chan/post/?board=" + board + "&num=" + postID;
       }
     },
     to: function(data) {
@@ -4821,6 +4826,9 @@
         case 'u':
         case 'kuku':
           url = Redirect.path('//nsfw.foolz.us', 'foolfuuka', data);
+          break;
+        case 'po':
+          url = Redirect.path('http://archive.thedarkcave.org', 'foolfuuka', data);
           break;
         case 'ck':
         case 'jp':
@@ -5620,7 +5628,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.37.1',
+    version: '2.37.3',
     callbacks: [],
     css: '\
 /* dialog styling */\

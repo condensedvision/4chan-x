@@ -1,6 +1,17 @@
 master
+- Mayhem
+  Add /po/ archive redirection for threads, images and post resurrection.
+
+2.37.3
+- Mayhem
+  Fix successful posting causing errors.
+  Fix 4chan X trying to interact with >>>/board/rules links.
+
+2.37.2
 - aeosynth
   Beep on new post to completely read thread
+- Mayhem
+  Fix dead quotes.
 
 2.37.1
 - noface
