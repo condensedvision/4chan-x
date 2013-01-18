@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.37.3
+// @version        2.37.4
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -27,7 +27,7 @@
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012 Nicolas Stepien <stepien.nicolas@gmail.com>
  * http://mayhemydg.github.com/4chan-x/
- * 4chan X 2.37.3
+ * 4chan X 2.37.4
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -1787,7 +1787,7 @@
       return $.on(d, 'dragstart dragend', QR.drag);
     },
     node: function(post) {
-      return $.on($('a[title="Quote this post"]', post.el), 'click', QR.quote);
+      return $.on($('.postInfo a[title="Quote this post"]', post.el), 'click', QR.quote);
     },
     open: function() {
       if (QR.el) {
@@ -4898,7 +4898,7 @@
       return Main.callbacks.push(this.node);
     },
     node: function(post) {
-      if (!post.img) {
+      if (!post.img || post.hasPdf) {
         return;
       }
       return $.on(post.img, 'mouseover', ImageHover.mouseover);
@@ -5024,7 +5024,7 @@
     },
     node: function(post) {
       var a;
-      if (!post.img) {
+      if (!post.img || post.hasPdf) {
         return;
       }
       a = post.img.parentNode;
@@ -5126,9 +5126,14 @@
       thumb.nextSibling.hidden = true;
       return $.rmClass(thumb.parentNode.parentNode.parentNode, 'image_expanded');
     },
-    expand: function(thumb, url) {
+    expand: function(thumb, src) {
       var a, img;
       if ($.x('ancestor-or-self::*[@hidden]', thumb)) {
+        return;
+      }
+      a = thumb.parentNode;
+      src || (src = a.href);
+      if (/\.pdf$/.test(src)) {
         return;
       }
       thumb.hidden = true;
@@ -5137,9 +5142,8 @@
         img.hidden = false;
         return;
       }
-      a = thumb.parentNode;
       img = $.el('img', {
-        src: url || a.href
+        src: src
       });
       $.on(img, 'error', ImageExpand.error);
       return $.add(a, img);
@@ -5546,7 +5550,7 @@
       }
     },
     preParse: function(node) {
-      var el, img, parentClass, post;
+      var el, img, imgParent, parentClass, post;
       parentClass = node.parentNode.className;
       el = $('.post', node);
       post = {
@@ -5565,8 +5569,10 @@
         img: false
       };
       if (img = $('img[data-md5]', el)) {
-        post.fileInfo = img.parentNode.previousElementSibling;
+        imgParent = img.parentNode;
         post.img = img;
+        post.fileInfo = imgParent.previousElementSibling;
+        post.hasPdf = /\.pdf$/.test(imgParent.href);
       }
       Main.prettify(post.blockquote);
       return post;
@@ -5628,7 +5634,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.37.3',
+    version: '2.37.4',
     callbacks: [],
     css: '\
 /* dialog styling */\
