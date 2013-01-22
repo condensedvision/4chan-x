@@ -1378,7 +1378,7 @@ QR =
     $.on d, 'dragstart dragend', QR.drag
 
   node: (post) ->
-    $.on $('.postInfo a[title="Quote this post"]', post.el), 'click', QR.quote
+    $.on $('a[title="Quote this post"]', $('.postInfo', post.el)), 'click', QR.quote
 
   open: ->
     if QR.el
@@ -4145,13 +4145,13 @@ ImageExpand =
     return if /\.pdf$/.test src
     thumb.hidden = true
     $.addClass thumb.parentNode.parentNode.parentNode, 'image_expanded'
-    if img = thumb.nextSibling
+    if (img = thumb.nextSibling) && img.nodeName is 'IMG'
       # Expand already loaded picture
       img.hidden = false
       return
     img = $.el 'img', { src }
     $.on img, 'error', ImageExpand.error
-    $.add a, img
+    $.after thumb, img
 
   error: ->
     thumb = @previousSibling
@@ -4537,7 +4537,7 @@ Main =
     $.globalEval "(#{code})()".replace '_id_', bq.id
 
   namespace: '4chan_x.'
-  version: '2.37.4'
+  version: '2.37.6'
   callbacks: []
   css: '
 /* dialog styling */

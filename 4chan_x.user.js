@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.37.4
+// @version        2.37.6
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -27,7 +27,7 @@
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012 Nicolas Stepien <stepien.nicolas@gmail.com>
  * http://mayhemydg.github.com/4chan-x/
- * 4chan X 2.37.4
+ * 4chan X 2.37.6
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -1787,7 +1787,7 @@
       return $.on(d, 'dragstart dragend', QR.drag);
     },
     node: function(post) {
-      return $.on($('.postInfo a[title="Quote this post"]', post.el), 'click', QR.quote);
+      return $.on($('a[title="Quote this post"]', $('.postInfo', post.el)), 'click', QR.quote);
     },
     open: function() {
       if (QR.el) {
@@ -5138,7 +5138,7 @@
       }
       thumb.hidden = true;
       $.addClass(thumb.parentNode.parentNode.parentNode, 'image_expanded');
-      if (img = thumb.nextSibling) {
+      if ((img = thumb.nextSibling) && img.nodeName === 'IMG') {
         img.hidden = false;
         return;
       }
@@ -5146,7 +5146,7 @@
         src: src
       });
       $.on(img, 'error', ImageExpand.error);
-      return $.add(a, img);
+      return $.after(thumb, img);
     },
     error: function() {
       var src, thumb, timeoutID, url;
@@ -5634,7 +5634,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.37.4',
+    version: '2.37.6',
     callbacks: [],
     css: '\
 /* dialog styling */\

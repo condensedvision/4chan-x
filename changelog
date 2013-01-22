@@ -1,5 +1,13 @@
 master
 
+2.37.6
+- Mayhem
+  Fix image expanding.
+
+2.37.5
+- Mayhem
+  Fix quoting inside inlined backlinks.
+
 2.37.4
 - James Campos
   Don't expand pdfs
