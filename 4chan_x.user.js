@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.37.6
+// @version        2.39.2
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -25,9 +25,9 @@
 /* LICENSE
  *
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
- * Copyright (c) 2012 Nicolas Stepien <stepien.nicolas@gmail.com>
- * http://mayhemydg.github.com/4chan-x/
- * 4chan X 2.37.6
+ * Copyright (c) 2012-2013 Nicolas Stepien <stepien.nicolas@gmail.com>
+ * http://mayhemydg.github.io/4chan-x/
+ * 4chan X 2.39.2
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -81,7 +81,7 @@
  */
 
 (function() {
-  var $, $$, Anonymize, ArchiveLink, AutoGif, Build, CatalogLinks, Conf, Config, DeleteLink, DownloadLink, ExpandComment, ExpandThread, Favicon, FileInfo, Filter, Get, ImageExpand, ImageHover, Keybinds, Main, Menu, Nav, Options, PngFix, QR, QuoteBacklink, QuoteCT, QuoteInline, QuoteOP, QuotePreview, Quotify, Redirect, ReplyHiding, ReportLink, RevealSpoilers, Sauce, StrikethroughQuotes, ThreadHiding, ThreadStats, Time, TitlePost, UI, Unread, Updater, Watcher, d, g;
+  var $, $$, Anonymize, ArchiveLink, AutoGif, Build, CatalogLinks, Conf, Config, DeleteLink, DownloadLink, ExpandComment, ExpandThread, Favicon, FileInfo, Filter, Get, ImageExpand, ImageHover, Keybinds, Main, Menu, Nav, Options, PngFix, QR, QuoteBacklink, QuoteCT, QuoteInline, QuoteOP, QuotePreview, Quotify, Redirect, RelativeDates, ReplyHiding, ReportLink, RevealSpoilers, Sauce, StrikethroughQuotes, ThreadHiding, ThreadStats, Time, TitlePost, UI, Unread, Updater, Watcher, d, g;
 
   Config = {
     main: {
@@ -91,6 +91,7 @@
         '404 Redirect': [true, 'Redirect dead threads and images'],
         'Keybinds': [true, 'Binds actions to keys'],
         'Time Formatting': [true, 'Arbitrarily formatted timestamps, using your local time'],
+        'Relative Post Dates': [false, 'Display dates as "3 minutes ago" f.e., tooltip shows the timestamp'],
         'File Info Formatting': [true, 'Reformats the file information'],
         'Comment Expansion': [true, 'Expand too long comments'],
         'Thread Expansion': [true, 'View all replies'],
@@ -516,8 +517,19 @@
       size = unit > 1 ? Math.round(size * 100) / 100 : Math.round(size);
       return "" + size + " " + ['B', 'KB', 'MB', 'GB'][unit];
     },
-    hidden: function() {
-      return d.hidden || d.oHidden || d.mozHidden || d.webkitHidden;
+    debounce: function(wait, fn) {
+      var timeout;
+      timeout = null;
+      return function() {
+        if (timeout) {
+          clearTimeout(timeout);
+        } else {
+          fn.apply(this, arguments);
+        }
+        return timeout = setTimeout((function() {
+          return timeout = null;
+        }), wait);
+      };
     }
   });
 
@@ -1841,7 +1853,7 @@
       if (QR.captcha.isEnabled && /captcha|verification/i.test(el.textContent)) {
         $('[autocomplete]', QR.el).focus();
       }
-      if ($.hidden()) {
+      if (d.hidden) {
         return alert(el.textContent);
       }
     },
@@ -2710,9 +2722,9 @@
         className: 'reply dialog',
         innerHTML: '<div id=optionsbar>\
   <div id=credits>\
-    <a target=_blank href=http://mayhemydg.github.com/4chan-x/>4chan X</a>\
+    <a target=_blank href=http://mayhemydg.github.io/4chan-x/>4chan X</a>\
     | <a target=_blank href=https://raw.github.com/mayhemydg/4chan-x/master/changelog>' + Main.version + '</a>\
-    | <a target=_blank href=http://mayhemydg.github.com/4chan-x/#bug-report>Issues</a>\
+    | <a target=_blank href=http://mayhemydg.github.io/4chan-x/#bug-report>Issues</a>\
   </div>\
   <div>\
     <label for=main_tab>Main</label>\
@@ -2725,7 +2737,14 @@
 <hr>\
 <div id=content>\
   <input type=radio name=tab hidden id=main_tab checked>\
-  <div></div>\
+  <div>\
+    <div class=imp-exp>\
+      <button class=export>Export settings</button>\
+      <button class=import>Import settings</button>\
+      <input type=file style="visibility:hidden">\
+    </div>\
+    <p class=imp-exp-result></p>\
+  </div>\
   <input type=radio name=tab hidden id=sauces_tab>\
   <div>\
     <div class=warning><code>Sauce</code> is disabled.</div>\
@@ -2807,6 +2826,9 @@
   </div>\
 </div>'
       });
+      $.on($('#main_tab + div .export', dialog), 'click', Options["export"]);
+      $.on($('#main_tab + div .import', dialog), 'click', Options["import"]);
+      $.on($('#main_tab + div input', dialog), 'change', Options.onImport);
       _ref = Config.main;
       for (key in _ref) {
         obj = _ref[key];
@@ -2982,6 +3004,67 @@
       Favicon["switch"]();
       Unread.update(true);
       return this.nextElementSibling.innerHTML = "<img src=" + Favicon.unreadSFW + "> <img src=" + Favicon.unreadNSFW + "> <img src=" + Favicon.unreadDead + ">";
+    },
+    "export": function() {
+      var a, data, now, output;
+      now = Date.now();
+      data = {
+        version: Main.version,
+        date: now,
+        Conf: Conf,
+        WatchedThreads: $.get('watched', {})
+      };
+      a = $.el('a', {
+        className: 'warning',
+        textContent: 'Save me!',
+        download: "4chan X v" + Main.version + "-" + now + ".json",
+        href: "data:application/json;base64," + (btoa(unescape(encodeURIComponent(JSON.stringify(data))))),
+        target: '_blank'
+      });
+      if ($.engine !== 'gecko') {
+        a.click();
+        return;
+      }
+      output = this.parentNode.nextElementSibling;
+      output.innerHTML = null;
+      return $.add(output, a);
+    },
+    "import": function() {
+      return this.nextElementSibling.click();
+    },
+    onImport: function() {
+      var file, output, reader;
+      if (!(file = this.files[0])) {
+        return;
+      }
+      output = this.parentNode.nextElementSibling;
+      if (!confirm('Your current settings will be entirely overwritten, are you sure?')) {
+        output.textContent = 'Import aborted.';
+        return;
+      }
+      reader = new FileReader();
+      reader.onload = function(e) {
+        var data;
+        try {
+          data = JSON.parse(e.target.result);
+          Options.loadSettings(data);
+          if (confirm('Import successful. Refresh now?')) {
+            return window.location.reload();
+          }
+        } catch (err) {
+          return output.textContent = 'Import failed due to an error.';
+        }
+      };
+      return reader.readAsText(file);
+    },
+    loadSettings: function(data) {
+      var key, val, _ref;
+      _ref = data.Conf;
+      for (key in _ref) {
+        val = _ref[key];
+        $.set(key, val);
+      }
+      return $.set('watched', data.WatchedThreads);
     }
   };
 
@@ -3032,7 +3115,7 @@
       }
       $.add(d.body, dialog);
       $.on(d, 'QRPostSuccessful', this.cb.post);
-      return $.on(d, 'visibilitychange ovisibilitychange mozvisibilitychange webkitvisibilitychange', this.cb.visibility);
+      return $.on(d, 'visibilitychange', this.cb.visibility);
     },
     /*
       http://freesound.org/people/pierrecartoons1979/sounds/90112/
@@ -3050,7 +3133,7 @@
         return setTimeout(Updater.update, 500);
       },
       visibility: function() {
-        if ($.hidden()) {
+        if (d.hidden) {
           return;
         }
         if (Updater.timer.textContent < -Conf['Interval']) {
@@ -3085,7 +3168,7 @@
         return Updater.scrollBG = this.checked ? function() {
           return true;
         } : function() {
-          return !$.hidden();
+          return !d.hidden;
         };
       },
       load: function() {
@@ -3153,8 +3236,9 @@
           Updater.set('count', "+" + count);
           Updater.count.className = count ? 'new' : null;
         }
-        if (count && Conf['Beep'] && $.hidden() && Unread.replies.length === 0) {
+        if (count && Conf['Beep'] && d.hidden && (Unread.replies.length === 0)) {
           Updater.audio.play();
+          return;
         }
         scroll = Conf['Scrolling'] && Updater.scrollBG() && lastPost.getBoundingClientRect().bottom - d.documentElement.clientHeight < 25;
         $.add(Updater.thread, nodes.reverse());
@@ -3513,6 +3597,68 @@
       y: function() {
         return Time.date.getFullYear() - 2000;
       }
+    }
+  };
+
+  RelativeDates = {
+    INTERVAL: $.MINUTE,
+    init: function() {
+      Main.callbacks.push(this.node);
+      return $.on(d, 'visibilitychange', this.flush);
+    },
+    node: function(post) {
+      var dateEl, diff, utc;
+      dateEl = $('.postInfo > .dateTime', post.el);
+      dateEl.title = dateEl.textContent;
+      utc = dateEl.dataset.utc * 1000;
+      diff = Date.now() - utc;
+      dateEl.textContent = RelativeDates.relative(diff);
+      RelativeDates.setUpdate(dateEl, utc, diff);
+      return RelativeDates.flush();
+    },
+    relative: function(diff) {
+      var number, rounded, unit;
+      unit = (number = diff / $.DAY) > 1 ? 'day' : (number = diff / $.HOUR) > 1 ? 'hour' : (number = diff / $.MINUTE) > 1 ? 'minute' : (number = diff / $.SECOND, 'second');
+      rounded = Math.round(number);
+      if (rounded !== 1) {
+        unit += 's';
+      }
+      return "" + rounded + " " + unit + " ago";
+    },
+    stale: [],
+    flush: $.debounce($.SECOND, function() {
+      var now, update, _i, _len, _ref;
+      if (d.hidden) {
+        return;
+      }
+      now = Date.now();
+      _ref = RelativeDates.stale;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        update = _ref[_i];
+        update(now);
+      }
+      RelativeDates.stale = [];
+      clearTimeout(RelativeDates.timeout);
+      return RelativeDates.timeout = setTimeout(RelativeDates.flush, RelativeDates.INTERVAL);
+    }),
+    setUpdate: function(dateEl, utc, diff) {
+      var markStale, setOwnTimeout, update;
+      setOwnTimeout = function(diff) {
+        var delay;
+        delay = diff < $.MINUTE ? $.SECOND - (diff + $.SECOND / 2) % $.SECOND : diff < $.HOUR ? $.MINUTE - (diff + $.MINUTE / 2) % $.MINUTE : $.HOUR - (diff + $.HOUR / 2) % $.HOUR;
+        return setTimeout(markStale, delay);
+      };
+      update = function(now) {
+        if (d.contains(dateEl)) {
+          diff = now - utc;
+          dateEl.textContent = RelativeDates.relative(diff);
+          return setOwnTimeout(diff);
+        }
+      };
+      markStale = function() {
+        return RelativeDates.stale.push(update);
+      };
+      return setOwnTimeout(diff);
     }
   };
 
@@ -4751,20 +4897,24 @@
     image: function(board, filename) {
       switch (board) {
         case 'a':
-        case 'jp':
+        case 'gd':
         case 'm':
         case 'q':
-        case 'sp':
         case 'tg':
         case 'vg':
+        case 'vp':
+        case 'vr':
         case 'wsg':
           return "//archive.foolz.us/" + board + "/full_image/" + filename;
         case 'u':
           return "//nsfw.foolz.us/" + board + "/full_image/" + filename;
         case 'po':
-          return "http://archive.thedarkcave.org/" + board + "/full_image/" + filename;
+          return "//archive.thedarkcave.org/" + board + "/full_image/" + filename;
         case 'ck':
+        case 'fa':
+        case 'jp':
         case 'lit':
+        case 's4s':
           return "//fuuka.warosu.org/" + board + "/full_image/" + filename;
         case 'cgl':
         case 'g':
@@ -4784,6 +4934,7 @@
       switch (board) {
         case 'a':
         case 'co':
+        case 'gd':
         case 'm':
         case 'q':
         case 'sp':
@@ -4791,15 +4942,20 @@
         case 'tv':
         case 'v':
         case 'vg':
+        case 'vp':
+        case 'vr':
         case 'wsg':
         case 'dev':
         case 'foolz':
-          return "//archive.foolz.us/api/chan/post/board/" + board + "/num/" + postID + "/format/json";
+          return "//archive.foolz.us/_/api/chan/post/?board=" + board + "&num=" + postID;
         case 'u':
         case 'kuku':
           return "//nsfw.foolz.us/_/api/chan/post/?board=" + board + "&num=" + postID;
+        case 'c':
+        case 'int':
+        case 'out':
         case 'po':
-          return "http://archive.thedarkcave.org/_/api/chan/post/?board=" + board + "&num=" + postID;
+          return "//archive.thedarkcave.org/_/api/chan/post/?board=" + board + "&num=" + postID;
       }
     },
     to: function(data) {
@@ -4811,6 +4967,7 @@
       switch (board) {
         case 'a':
         case 'co':
+        case 'gd':
         case 'm':
         case 'q':
         case 'sp':
@@ -4818,6 +4975,8 @@
         case 'tv':
         case 'v':
         case 'vg':
+        case 'vp':
+        case 'vr':
         case 'wsg':
         case 'dev':
         case 'foolz':
@@ -4827,12 +4986,16 @@
         case 'kuku':
           url = Redirect.path('//nsfw.foolz.us', 'foolfuuka', data);
           break;
+        case 'int':
+        case 'out':
         case 'po':
-          url = Redirect.path('http://archive.thedarkcave.org', 'foolfuuka', data);
+          url = Redirect.path('//archive.thedarkcave.org', 'foolfuuka', data);
           break;
         case 'ck':
+        case 'fa':
         case 'jp':
         case 'lit':
+        case 's4s':
           url = Redirect.path('//fuuka.warosu.org', 'fuuka', data);
           break;
         case 'diy':
@@ -5303,10 +5466,26 @@
         settings.disableAll = true;
         localStorage.setItem('4chan-settings', JSON.stringify(settings));
       }
+      Main.polyfill();
       if (g.CATALOG) {
         return $.ready(Main.catalog);
       } else {
         return Main.features();
+      }
+    },
+    polyfill: function() {
+      var event, prefix, property;
+      if (!('visibilityState' in document)) {
+        prefix = 'mozVisibilityState' in document ? 'moz' : 'webkitVisibilityState' in document ? 'webkit' : 'o';
+        property = prefix + 'VisibilityState';
+        event = prefix + 'visibilitychange';
+        d.visibilityState = d[property];
+        d.hidden = d.visibilityState === 'hidden';
+        return $.on(d, event, function() {
+          d.visibilityState = d[property];
+          d.hidden = d.visibilityState === 'hidden';
+          return $.event(d, new CustomEvent('visibilitychange'));
+        });
       }
     },
     catalog: function() {
@@ -5369,6 +5548,9 @@
       }
       if (Conf['Time Formatting']) {
         Time.init();
+      }
+      if (Conf['Relative Post Dates']) {
+        RelativeDates.init();
       }
       if (Conf['File Info Formatting']) {
         FileInfo.init();
@@ -5589,7 +5771,7 @@
           }
         } catch (err) {
           if (notify) {
-            alert("4chan X (" + Main.version + ") error: " + err.message + "\nReport the bug at mayhemydg.github.com/4chan-x/#bug-report\n\nURL: " + window.location + "\n" + err.stack);
+            alert("4chan X (" + Main.version + ") error: " + err.message + "\nReport the bug at mayhemydg.github.io/4chan-x/#bug-report\n\nURL: " + window.location + "\n" + err.stack);
           }
         }
       }
@@ -5634,7 +5816,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.37.6',
+    version: '2.39.2',
     callbacks: [],
     css: '\
 /* dialog styling */\

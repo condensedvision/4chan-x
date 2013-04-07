@@ -6,6 +6,7 @@ Config =
       '404 Redirect':                 [true,  'Redirect dead threads and images']
       'Keybinds':                     [true,  'Binds actions to keys']
       'Time Formatting':              [true,  'Arbitrarily formatted timestamps, using your local time']
+      'Relative Post Dates':          [false, 'Display dates as "3 minutes ago" f.e., tooltip shows the timestamp']
       'File Info Formatting':         [true,  'Reformats the file information']
       'Comment Expansion':            [true,  'Expand too long comments']
       'Thread Expansion':             [true,  'View all replies']
@@ -395,8 +396,19 @@ $.extend $,
         # Round to an integer otherwise.
         Math.round size
     "#{size} #{['B', 'KB', 'MB', 'GB'][unit]}"
-  hidden: ->
-    d.hidden or d.oHidden or d.mozHidden or d.webkitHidden
+  # a function that will execute at most every 'wait' ms. executes immediately
+  # if possible, else discards invocation
+  debounce: (wait, fn) ->
+    timeout = null
+    return ->
+      if timeout
+        # stop current reset
+        clearTimeout timeout
+      else
+        fn.apply this, arguments
+
+      # after wait, let next invocation execute immediately
+      timeout = setTimeout (-> timeout = null), wait
 
 $.cache.requests = {}
 
@@ -1420,7 +1432,7 @@ QR =
     if QR.captcha.isEnabled and /captcha|verification/i.test el.textContent
       # Focus the captcha input on captcha error.
       $('[autocomplete]', QR.el).focus()
-    alert el.textContent if $.hidden()
+    alert el.textContent if d.hidden
   cleanError: ->
     $('.warning', QR.el).textContent = null
 
@@ -1897,7 +1909,7 @@ QR =
         if g.BOARD is 'f'
           $('select[name=filetag]').cloneNode true
         else
-          $.el 'select'
+          $.el 'select',
             innerHTML: threads
             title: 'Create a new thread / Reply to a thread'
       $.prepend $('.move > span', QR.el), QR.threadSelector
@@ -2151,14 +2163,14 @@ Options =
       Options.dialog()
 
   dialog: ->
-    dialog = $.el 'div'
+    dialog = $.el 'div',
       id: 'options'
       className: 'reply dialog'
       innerHTML: '<div id=optionsbar>
   <div id=credits>
-    <a target=_blank href=http://mayhemydg.github.com/4chan-x/>4chan X</a>
+    <a target=_blank href=http://mayhemydg.github.io/4chan-x/>4chan X</a>
     | <a target=_blank href=https://raw.github.com/mayhemydg/4chan-x/master/changelog>' + Main.version + '</a>
-    | <a target=_blank href=http://mayhemydg.github.com/4chan-x/#bug-report>Issues</a>
+    | <a target=_blank href=http://mayhemydg.github.io/4chan-x/#bug-report>Issues</a>
   </div>
   <div>
     <label for=main_tab>Main</label>
@@ -2171,7 +2183,14 @@ Options =
 <hr>
 <div id=content>
   <input type=radio name=tab hidden id=main_tab checked>
-  <div></div>
+  <div>
+    <div class=imp-exp>
+      <button class=export>Export settings</button>
+      <button class=import>Import settings</button>
+      <input type=file style="visibility:hidden">
+    </div>
+    <p class=imp-exp-result></p>
+  </div>
   <input type=radio name=tab hidden id=sauces_tab>
   <div>
     <div class=warning><code>Sauce</code> is disabled.</div>
@@ -2252,6 +2271,10 @@ Options =
     </tbody></table>
   </div>
 </div>'
+
+    $.on $('#main_tab + div .export', dialog), 'click',  Options.export
+    $.on $('#main_tab + div .import', dialog), 'click',  Options.import
+    $.on $('#main_tab + div input',   dialog), 'change', Options.onImport
 
     #main
     for key, obj of Config.main
@@ -2409,6 +2432,49 @@ Options =
     Unread.update true
     @nextElementSibling.innerHTML = "<img src=#{Favicon.unreadSFW}> <img src=#{Favicon.unreadNSFW}> <img src=#{Favicon.unreadDead}>"
 
+  export: ->
+    now  = Date.now()
+    data =
+      version: Main.version
+      date: now
+      Conf: Conf
+      WatchedThreads: $.get('watched', {})
+    a = $.el 'a',
+      className: 'warning'
+      textContent: 'Save me!'
+      download: "4chan X v#{Main.version}-#{now}.json"
+      href: "data:application/json;base64,#{btoa unescape encodeURIComponent JSON.stringify data}"
+      target: '_blank'
+    if $.engine isnt 'gecko'
+      a.click()
+      return
+    # XXX Firefox won't let us download automatically.
+    output = @parentNode.nextElementSibling
+    output.innerHTML = null
+    $.add output, a
+  import: ->
+    @nextElementSibling.click()
+  onImport: ->
+    return unless file = @files[0]
+    output = @parentNode.nextElementSibling
+    unless confirm 'Your current settings will be entirely overwritten, are you sure?'
+      output.textContent = 'Import aborted.'
+      return
+    reader = new FileReader()
+    reader.onload = (e) ->
+      try
+        data = JSON.parse e.target.result
+        Options.loadSettings data
+        if confirm 'Import successful. Refresh now?'
+          window.location.reload()
+      catch err
+        output.textContent = 'Import failed due to an error.'
+    reader.readAsText file
+  loadSettings: (data) ->
+    for key, val of data.Conf
+      $.set key, val
+    $.set 'watched', data.WatchedThreads
+
 Updater =
   init: ->
     html = '<div class=move><span id=count></span> <span id=timer></span></div>'
@@ -2455,7 +2521,7 @@ Updater =
     $.add d.body, dialog
 
     $.on d, 'QRPostSuccessful', @cb.post
-    $.on d, 'visibilitychange ovisibilitychange mozvisibilitychange webkitvisibilitychange', @cb.visibility
+    $.on d, 'visibilitychange', @cb.visibility
 
   ###
   http://freesound.org/people/pierrecartoons1979/sounds/90112/
@@ -2468,7 +2534,7 @@ Updater =
       return unless Conf['Auto Update This']
       setTimeout Updater.update, 500
     visibility: ->
-      return if $.hidden()
+      return if d.hidden
       # Reset the counter when we focus this tab.
       if Updater.timer.textContent < -Conf['Interval']
         Updater.set 'timer', -Conf['Interval']
@@ -2495,7 +2561,7 @@ Updater =
         if @checked
           -> true
         else
-          -> ! $.hidden()
+          -> ! d.hidden
     load: ->
       switch @status
         when 404
@@ -2548,8 +2614,9 @@ Updater =
         Updater.set 'count', "+#{count}"
         Updater.count.className = if count then 'new' else null
 
-      if count and Conf['Beep'] and $.hidden() and Unread.replies.length is 0
+      if count and Conf['Beep'] and d.hidden and (Unread.replies.length is 0)
         Updater.audio.play()
+        return
 
       scroll = Conf['Scrolling'] and Updater.scrollBG() and
         lastPost.getBoundingClientRect().bottom - d.documentElement.clientHeight < 25
@@ -2806,6 +2873,96 @@ Time =
     P: -> if Time.date.getHours() < 12 then 'am' else 'pm'
     S: -> Time.zeroPad Time.date.getSeconds()
     y: -> Time.date.getFullYear() - 2000
+
+RelativeDates =
+  INTERVAL: $.MINUTE
+  init: ->
+    Main.callbacks.push @node
+
+    # flush when page becomes visible again
+    $.on d, 'visibilitychange', @flush
+  node: (post) ->
+    dateEl = $ '.postInfo > .dateTime', post.el
+
+    # Show original absolute time as tooltip so users can still know exact times
+    # Since "Time Formatting" runs `node` before us, the title tooltip will
+    # pick up the user-formatted time instead of 4chan time when enabled.
+    dateEl.title = dateEl.textContent
+
+    # convert data-utc to milliseconds
+    utc = dateEl.dataset.utc * 1000
+
+    diff = Date.now() - utc
+
+    dateEl.textContent = RelativeDates.relative diff
+    RelativeDates.setUpdate dateEl, utc, diff
+
+    # Main calls @node whenever a DOM node is added (update, inline post,
+    # whatever), so use also this reflow opportunity to flush any other dates
+    # flush is debounced, so this won't burn too much cpu
+    RelativeDates.flush()
+
+  # diff is milliseconds from now
+  relative: (diff) ->
+    unit = if (number = (diff / $.DAY)) > 1
+      'day'
+    else if (number = (diff / $.HOUR)) > 1
+      'hour'
+    else if (number = (diff / $.MINUTE)) > 1
+      'minute'
+    else
+      number = diff / $.SECOND
+      'second'
+
+    rounded = Math.round number
+    unit += 's' if rounded isnt 1 # pluralize
+
+    "#{rounded} #{unit} ago"
+
+  # changing all relative dates as soon as possible incurs many annoying
+  # redraws and scroll stuttering. Thus, sacrifice accuracy for UX/CPU economy,
+  # and perform redraws when the DOM is otherwise being manipulated (and scroll
+  # stuttering won't be noticed), falling back to INTERVAL while the page
+  # is visible.
+  #
+  # each individual dateTime element will add its update() function to the stale list
+  # when it to be called.
+  stale: []
+  flush: $.debounce($.SECOND, ->
+    # no point in changing the dates until the user sees them
+    return if d.hidden
+
+    now = Date.now()
+    update now for update in RelativeDates.stale
+    RelativeDates.stale = []
+
+    # reset automatic flush
+    clearTimeout RelativeDates.timeout
+    RelativeDates.timeout = setTimeout RelativeDates.flush, RelativeDates.INTERVAL)
+
+  # create function `update()`, closed over dateEl and diff, that, when called
+  # from `flush()`, updates the element, and re-calls `setOwnTimeout()` to
+  # re-add `update()` to the stale list later.
+  setUpdate: (dateEl, utc, diff) ->
+    setOwnTimeout = (diff) ->
+      delay = if diff < $.MINUTE
+        $.SECOND - (diff + $.SECOND / 2) % $.SECOND
+      else if diff < $.HOUR
+        $.MINUTE - (diff + $.MINUTE / 2) % $.MINUTE
+      else
+        $.HOUR - (diff + $.HOUR / 2) % $.HOUR
+      setTimeout markStale, delay
+
+    update = (now) ->
+      if d.contains dateEl # not removed from DOM
+        diff = now - utc
+        dateEl.textContent = RelativeDates.relative diff
+        setOwnTimeout diff
+
+    markStale = -> RelativeDates.stale.push update
+
+    # kick off initial timeout with current diff
+    setOwnTimeout diff
 
 FileInfo =
   init: ->
@@ -3904,13 +4061,13 @@ Redirect =
   image: (board, filename) ->
     # Do not use g.BOARD, the image url can originate from a cross-quote.
     switch board
-      when 'a', 'jp', 'm', 'q', 'sp', 'tg', 'vg', 'wsg'
+      when 'a', 'gd', 'm', 'q', 'tg', 'vg', 'vp', 'vr', 'wsg'
         "//archive.foolz.us/#{board}/full_image/#{filename}"
       when 'u'
         "//nsfw.foolz.us/#{board}/full_image/#{filename}"
       when 'po'
-        "http://archive.thedarkcave.org/#{board}/full_image/#{filename}"
-      when 'ck', 'lit'
+        "//archive.thedarkcave.org/#{board}/full_image/#{filename}"
+      when 'ck', 'fa', 'jp', 'lit', 's4s'
         "//fuuka.warosu.org/#{board}/full_image/#{filename}"
       when 'cgl', 'g', 'mu', 'w'
         "//rbt.asia/#{board}/full_image/#{filename}"
@@ -3920,24 +4077,24 @@ Redirect =
         "//archive.nyafuu.org/#{board}/full_image/#{filename}"
   post: (board, postID) ->
     switch board
-      when 'a', 'co', 'm', 'q', 'sp', 'tg', 'tv', 'v', 'vg', 'wsg', 'dev', 'foolz'
-        "//archive.foolz.us/api/chan/post/board/#{board}/num/#{postID}/format/json"
+      when 'a', 'co', 'gd', 'm', 'q', 'sp', 'tg', 'tv', 'v', 'vg', 'vp', 'vr', 'wsg', 'dev', 'foolz'
+        "//archive.foolz.us/_/api/chan/post/?board=#{board}&num=#{postID}"
       when 'u', 'kuku'
         "//nsfw.foolz.us/_/api/chan/post/?board=#{board}&num=#{postID}"
-      when 'po'
-        "http://archive.thedarkcave.org/_/api/chan/post/?board=#{board}&num=#{postID}"
+      when 'c', 'int', 'out', 'po'
+        "//archive.thedarkcave.org/_/api/chan/post/?board=#{board}&num=#{postID}"
   to: (data) ->
     unless data.isSearch
       {threadID} = data
     {board} = data
     switch board
-      when 'a', 'co', 'm', 'q', 'sp', 'tg', 'tv', 'v', 'vg', 'wsg', 'dev', 'foolz'
+      when 'a', 'co', 'gd', 'm', 'q', 'sp', 'tg', 'tv', 'v', 'vg', 'vp', 'vr', 'wsg', 'dev', 'foolz'
         url = Redirect.path '//archive.foolz.us', 'foolfuuka', data
       when 'u', 'kuku'
         url = Redirect.path '//nsfw.foolz.us', 'foolfuuka', data
-      when 'po'
-        url = Redirect.path 'http://archive.thedarkcave.org', 'foolfuuka', data
-      when 'ck', 'jp', 'lit'
+      when 'int', 'out', 'po'
+        url = Redirect.path '//archive.thedarkcave.org', 'foolfuuka', data
+      when 'ck', 'fa', 'jp', 'lit', 's4s'
         url = Redirect.path '//fuuka.warosu.org', 'fuuka', data
       when 'diy', 'sci'
         url = Redirect.path '//archive.installgentoo.net', 'fuuka', data
@@ -4005,7 +4162,7 @@ ImageHover =
     # Don't stop other elements from dragging
     return if UI.el
 
-    el = UI.el = $.el 'img'
+    el = UI.el = $.el 'img',
       id: 'ihover'
       src: @parentNode.href
     $.add d.body, el
@@ -4267,10 +4424,32 @@ Main =
       settings.disableAll = true
       localStorage.setItem '4chan-settings', JSON.stringify settings
 
+    Main.polyfill()
+
     if g.CATALOG
       $.ready Main.catalog
     else
       Main.features()
+
+  polyfill: ->
+    # page visibility API
+    unless 'visibilityState' of document
+      prefix = if 'mozVisibilityState' of document
+        'moz'
+      else if 'webkitVisibilityState' of document
+        'webkit'
+      else
+        'o'
+
+      property = prefix + 'VisibilityState'
+      event = prefix + 'visibilitychange'
+
+      d.visibilityState = d[property]
+      d.hidden = d.visibilityState is 'hidden'
+      $.on d, event, ->
+        d.visibilityState = d[property]
+        d.hidden = d.visibilityState is 'hidden'
+        $.event d, new CustomEvent 'visibilitychange'
 
   catalog: ->
     if Conf['Catalog Links']
@@ -4329,6 +4508,9 @@ Main =
 
     if Conf['Time Formatting']
       Time.init()
+
+    if Conf['Relative Post Dates']
+      RelativeDates.init()
 
     if Conf['File Info Formatting']
       FileInfo.init()
@@ -4514,7 +4696,7 @@ Main =
       try
         callback node for node in nodes
       catch err
-        alert "4chan X (#{Main.version}) error: #{err.message}\nReport the bug at mayhemydg.github.com/4chan-x/#bug-report\n\nURL: #{window.location}\n#{err.stack}" if notify
+        alert "4chan X (#{Main.version}) error: #{err.message}\nReport the bug at mayhemydg.github.io/4chan-x/#bug-report\n\nURL: #{window.location}\n#{err.stack}" if notify
     return
   observer: (mutations) ->
     nodes = []
@@ -4537,7 +4719,7 @@ Main =
     $.globalEval "(#{code})()".replace '_id_', bq.id
 
   namespace: '4chan_x.'
-  version: '2.37.6'
+  version: '2.39.2'
   callbacks: []
   css: '
 /* dialog styling */

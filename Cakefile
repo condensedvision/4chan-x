@@ -2,7 +2,7 @@
 {exec} = require 'child_process'
 fs     = require 'fs'
 
-VERSION = '2.37.6'
+VERSION = '2.39.2'
 
 HEADER  = """
 // ==UserScript==
@@ -32,8 +32,8 @@ HEADER  = """
 /* LICENSE
  *
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
- * Copyright (c) 2012 Nicolas Stepien <stepien.nicolas@gmail.com>
- * http://mayhemydg.github.com/4chan-x/
+ * Copyright (c) 2012-2013 Nicolas Stepien <stepien.nicolas@gmail.com>
+ * http://mayhemydg.github.io/4chan-x/
  * 4chan X #{VERSION}
  *
  * Permission is hereby granted, free of charge, to any person
@@ -112,7 +112,7 @@ task 'upgrade', (options) ->
   exec "git commit -am 'Release #{version}.' && git tag -a #{version} -m '#{version}' && git tag -af stable -m '#{version}'"
 
 task 'build', ->
-  exec 'coffee --print script.coffee', (err, stdout, stderr) ->
+  exec 'coffee --print script.coffee', {maxBuffer: 500 * 1024}, (err, stdout, stderr) ->
     throw err if err
     fs.writeFile OUTFILE, HEADER + stdout, (err) ->
       throw err if err
