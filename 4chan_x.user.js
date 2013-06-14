@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.39.4
+// @version        2.39.6
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -24,7 +24,7 @@
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012-2013 Nicolas Stepien <stepien.nicolas@gmail.com>
  * http://mayhemydg.github.io/4chan-x/
- * 4chan X 2.39.4
+ * 4chan X 2.39.6
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -2288,13 +2288,13 @@
           this.onready = function() {
             return _this.ready();
           };
-          return $.on($.id('recaptcha_widget_div'), 'DOMNodeInserted', this.onready);
+          return $.on($.id('captchaContainer'), 'DOMNodeInserted', this.onready);
         }
       },
       ready: function() {
         var _this = this;
         if (this.challenge = $.id('recaptcha_challenge_field_holder')) {
-          $.off($.id('recaptcha_widget_div'), 'DOMNodeInserted', this.onready);
+          $.off($.id('captchaContainer'), 'DOMNodeInserted', this.onready);
           delete this.onready;
         } else {
           return;
@@ -2687,7 +2687,7 @@
       return $.ready(Options.initReady);
     },
     initReady: function() {
-      var a, setting, settings, _i, _len, _ref;
+      var a, notice, setting, settings, _i, _len, _ref;
       _ref = ['navtopright', 'navbotright'];
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         settings = _ref[_i];
@@ -2699,10 +2699,17 @@
         $.on(a, 'click', Options.dialog);
         setting = $.id(settings);
         if (Conf['Disable 4chan\'s extension']) {
-          $.replace(setting.childNodes[1], a);
-          continue;
+          $.replace(setting.firstElementChild, a);
+        } else {
+          $.prepend(setting, [$.tn('['), a, $.tn('] ')]);
         }
-        $.prepend(setting, [$.tn('['), a, $.tn('] ')]);
+        notice = $.el('a', {
+          textContent: 'v2 is outdated.',
+          href: 'https://4chan-x.just-believe.in/',
+          target: '_blank'
+        });
+        notice.style.color = 'red';
+        $.prepend(setting, [$.tn('['), notice, $.tn('] ')]);
       }
       if (!$.get('firstrun')) {
         $.set('firstrun', true);
@@ -4901,7 +4908,6 @@
         case 'm':
         case 'q':
         case 'tg':
-        case 'vg':
         case 'vp':
         case 'vr':
         case 'wsg':
@@ -4910,24 +4916,50 @@
           return "//nsfw.foolz.us/" + board + "/full_image/" + filename;
         case 'po':
           return "//archive.thedarkcave.org/" + board + "/full_image/" + filename;
-        case 'ck':
-        case 'fa':
-        case 'jp':
-        case 'lit':
+        case 'hr':
+        case 'tv':
+        case 'x':
+          return "http://archive.4plebs.org/" + board + "/full_image/" + filename;
+        case 'c':
+        case 'w':
+        case 'wg':
+          return "//archive.nyafuu.org/" + board + "/full_image/" + filename;
+        case 'd':
+        case 'h':
+        case 'v':
+          return "//loveisover.me/" + board + "/full_image/" + filename;
+        case 'vg':
+          return "http://nth.pensivenonsen.se/" + board + "/full_image/" + filename;
+        case 'adv':
+        case 'asp':
+        case 'cm':
+        case 'e':
+        case 'i':
+        case 'lgbt':
+        case 'n':
+        case 'o':
+        case 'p':
+        case 's':
         case 's4s':
-          return "//fuuka.warosu.org/" + board + "/full_image/" + filename;
+        case 't':
+        case 'trv':
+        case 'y':
+          return "//archive.foolzashit.com/" + board + "/full_image/" + filename;
         case 'cgl':
         case 'g':
         case 'mu':
-        case 'w':
           return "//rbt.asia/" + board + "/full_image/" + filename;
         case 'an':
         case 'k':
         case 'toy':
-        case 'x':
           return "http://archive.heinessen.com/" + board + "/full_image/" + filename;
-        case 'c':
-          return "//archive.nyafuu.org/" + board + "/full_image/" + filename;
+        case '3':
+        case 'ck':
+        case 'fa':
+        case 'ic':
+        case 'jp':
+        case 'lit':
+          return "//fuuka.warosu.org/" + board + "/full_image/" + filename;
       }
     },
     post: function(board, postID) {
@@ -4940,22 +4972,44 @@
         case 'sp':
         case 'tg':
         case 'tv':
-        case 'v':
-        case 'vg':
         case 'vp':
         case 'vr':
         case 'wsg':
-        case 'dev':
-        case 'foolz':
-          return "//archive.foolz.us/_/api/chan/post/?board=" + board + "&num=" + postID;
+          return "https://archive.foolz.us/_/api/chan/post/?board=" + board + "&num=" + postID;
         case 'u':
-        case 'kuku':
-          return "//nsfw.foolz.us/_/api/chan/post/?board=" + board + "&num=" + postID;
-        case 'c':
+          return "https://nsfw.foolz.us/_/api/chan/post/?board=" + board + "&num=" + postID;
         case 'int':
         case 'out':
         case 'po':
           return "//archive.thedarkcave.org/_/api/chan/post/?board=" + board + "&num=" + postID;
+        case 'hr':
+        case 'x':
+          return "http://archive.4plebs.org/_/api/chan/post/?board=" + board + "&num=" + postID;
+        case 'c':
+        case 'w':
+        case 'wg':
+          return "//archive.nyafuu.org/_/api/chan/post/?board=" + board + "&num=" + postID;
+        case 'd':
+        case 'h':
+        case 'v':
+          return "//loveisover.me/_/api/chan/post/?board=" + board + "&num=" + postID;
+        case 'vg':
+          return "http://nth.pensivenonsen.se/_/api/chan/post/?board=" + board + "&num=" + postID;
+        case 'adv':
+        case 'asp':
+        case 'cm':
+        case 'e':
+        case 'i':
+        case 'lgbt':
+        case 'n':
+        case 'o':
+        case 'p':
+        case 's':
+        case 's4s':
+        case 't':
+        case 'trv':
+        case 'y':
+          return "//archive.foolzashit.com/_/api/chan/post/?board=" + board + "&num=" + postID;
       }
     },
     to: function(data) {
@@ -4973,17 +5027,12 @@
         case 'sp':
         case 'tg':
         case 'tv':
-        case 'v':
-        case 'vg':
         case 'vp':
         case 'vr':
         case 'wsg':
-        case 'dev':
-        case 'foolz':
           url = Redirect.path('//archive.foolz.us', 'foolfuuka', data);
           break;
         case 'u':
-        case 'kuku':
           url = Redirect.path('//nsfw.foolz.us', 'foolfuuka', data);
           break;
         case 'int':
@@ -4991,21 +5040,46 @@
         case 'po':
           url = Redirect.path('//archive.thedarkcave.org', 'foolfuuka', data);
           break;
-        case 'ck':
-        case 'fa':
-        case 'jp':
-        case 'lit':
+        case 'hr':
+        case 'x':
+          url = Redirect.path('http://archive.4plebs.org', 'foolfuuka', data);
+          break;
+        case 'c':
+        case 'w':
+        case 'wg':
+          url = Redirect.path('//archive.nyafuu.org', 'foolfuuka', data);
+          break;
+        case 'd':
+        case 'h':
+        case 'v':
+          url = Redirect.path('//loveisover.me', 'foolfuuka', data);
+          break;
+        case 'vg':
+          url = Redirect.path('http://nth.pensivenonsen.se', 'foolfuuka', data);
+          break;
+        case 'adv':
+        case 'asp':
+        case 'cm':
+        case 'e':
+        case 'i':
+        case 'lgbt':
+        case 'n':
+        case 'o':
+        case 'p':
+        case 's':
         case 's4s':
-          url = Redirect.path('//fuuka.warosu.org', 'fuuka', data);
+        case 't':
+        case 'trv':
+        case 'y':
+          url = Redirect.path('//archive.foolzashit.com', 'foolfuuka', data);
           break;
         case 'diy':
+        case 'g':
         case 'sci':
           url = Redirect.path('//archive.installgentoo.net', 'fuuka', data);
           break;
         case 'cgl':
-        case 'g':
         case 'mu':
-        case 'w':
           url = Redirect.path('//rbt.asia', 'fuuka', data);
           break;
         case 'an':
@@ -5014,11 +5088,15 @@
         case 'mlp':
         case 'r9k':
         case 'toy':
-        case 'x':
           url = Redirect.path('http://archive.heinessen.com', 'fuuka', data);
           break;
-        case 'c':
-          url = Redirect.path('//archive.nyafuu.org', 'fuuka', data);
+        case '3':
+        case 'ck':
+        case 'fa':
+        case 'ic':
+        case 'jp':
+        case 'lit':
+          url = Redirect.path('//fuuka.warosu.org', 'fuuka', data);
           break;
         default:
           if (threadID) {
@@ -5816,7 +5894,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.39.4',
+    version: '2.39.6',
     callbacks: [],
     css: '\
 /* dialog styling */\

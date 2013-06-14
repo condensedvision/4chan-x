@@ -1785,10 +1785,10 @@ QR =
         @ready()
       else
         @onready = => @ready()
-        $.on $.id('recaptcha_widget_div'), 'DOMNodeInserted', @onready
+        $.on $.id('captchaContainer'), 'DOMNodeInserted', @onready
     ready: ->
       if @challenge = $.id 'recaptcha_challenge_field_holder'
-        $.off $.id('recaptcha_widget_div'), 'DOMNodeInserted', @onready
+        $.off $.id('captchaContainer'), 'DOMNodeInserted', @onready
         delete @onready
       else
         return
@@ -2153,9 +2153,15 @@ Options =
       $.on a, 'click', Options.dialog
       setting = $.id settings
       if Conf['Disable 4chan\'s extension']
-        $.replace setting.childNodes[1], a
-        continue
-      $.prepend setting, [$.tn('['), a, $.tn('] ')]
+        $.replace setting.firstElementChild, a
+      else
+        $.prepend setting, [$.tn('['), a, $.tn('] ')]
+      notice = $.el 'a',
+        textContent: 'v2 is outdated.'
+        href: 'https://4chan-x.just-believe.in/'
+        target: '_blank'
+      notice.style.color = 'red'
+      $.prepend setting, [$.tn('['), notice, $.tn('] ')]
     unless $.get 'firstrun'
       $.set 'firstrun', true
       # Prevent race conditions
@@ -4063,49 +4069,77 @@ Redirect =
   image: (board, filename) ->
     # Do not use g.BOARD, the image url can originate from a cross-quote.
     switch board
-      when 'a', 'gd', 'm', 'q', 'tg', 'vg', 'vp', 'vr', 'wsg'
+      when 'a', 'gd', 'm', 'q', 'tg', 'vp', 'vr', 'wsg'
         "//archive.foolz.us/#{board}/full_image/#{filename}"
       when 'u'
         "//nsfw.foolz.us/#{board}/full_image/#{filename}"
       when 'po'
         "//archive.thedarkcave.org/#{board}/full_image/#{filename}"
-      when 'ck', 'fa', 'jp', 'lit', 's4s'
-        "//fuuka.warosu.org/#{board}/full_image/#{filename}"
-      when 'cgl', 'g', 'mu', 'w'
-        "//rbt.asia/#{board}/full_image/#{filename}"
-      when 'an', 'k', 'toy', 'x'
-        "http://archive.heinessen.com/#{board}/full_image/#{filename}"
-      when 'c'
+      when 'hr', 'tv', 'x'
+        "http://archive.4plebs.org/#{board}/full_image/#{filename}"
+      when 'c', 'w', 'wg'
         "//archive.nyafuu.org/#{board}/full_image/#{filename}"
+      when 'd', 'h', 'v'
+        "//loveisover.me/#{board}/full_image/#{filename}"
+      when 'vg'
+        "http://nth.pensivenonsen.se/#{board}/full_image/#{filename}"
+      when 'adv', 'asp', 'cm', 'e', 'i', 'lgbt', 'n', 'o', 'p', 's', 's4s', 't', 'trv', 'y'
+        "//archive.foolzashit.com/#{board}/full_image/#{filename}"
+      when 'cgl', 'g', 'mu'
+        "//rbt.asia/#{board}/full_image/#{filename}"
+      when 'an', 'k', 'toy'
+        "http://archive.heinessen.com/#{board}/full_image/#{filename}"
+      when '3', 'ck', 'fa', 'ic', 'jp', 'lit'
+        "//fuuka.warosu.org/#{board}/full_image/#{filename}"
   post: (board, postID) ->
+    # XXX foolz had HSTS set for 120 days, which broke XHR+CORS+Redirection when on HTTP.
+    # Remove necessary HTTPS procotol in September 2013.
     switch board
-      when 'a', 'co', 'gd', 'm', 'q', 'sp', 'tg', 'tv', 'v', 'vg', 'vp', 'vr', 'wsg', 'dev', 'foolz'
-        "//archive.foolz.us/_/api/chan/post/?board=#{board}&num=#{postID}"
-      when 'u', 'kuku'
-        "//nsfw.foolz.us/_/api/chan/post/?board=#{board}&num=#{postID}"
-      when 'c', 'int', 'out', 'po'
+      when 'a', 'co', 'gd', 'm', 'q', 'sp', 'tg', 'tv', 'vp', 'vr', 'wsg'
+        "https://archive.foolz.us/_/api/chan/post/?board=#{board}&num=#{postID}"
+      when 'u'
+        "https://nsfw.foolz.us/_/api/chan/post/?board=#{board}&num=#{postID}"
+      when 'int', 'out', 'po'
         "//archive.thedarkcave.org/_/api/chan/post/?board=#{board}&num=#{postID}"
+      when 'hr', 'x'
+        "http://archive.4plebs.org/_/api/chan/post/?board=#{board}&num=#{postID}"
+      when 'c', 'w', 'wg'
+        "//archive.nyafuu.org/_/api/chan/post/?board=#{board}&num=#{postID}"
+      when 'd', 'h', 'v'
+        "//loveisover.me/_/api/chan/post/?board=#{board}&num=#{postID}"
+      when 'vg'
+        "http://nth.pensivenonsen.se/_/api/chan/post/?board=#{board}&num=#{postID}"
+      when 'adv', 'asp', 'cm', 'e', 'i', 'lgbt', 'n', 'o', 'p', 's', 's4s', 't', 'trv', 'y'
+        "//archive.foolzashit.com/_/api/chan/post/?board=#{board}&num=#{postID}"
   to: (data) ->
     unless data.isSearch
       {threadID} = data
     {board} = data
     switch board
-      when 'a', 'co', 'gd', 'm', 'q', 'sp', 'tg', 'tv', 'v', 'vg', 'vp', 'vr', 'wsg', 'dev', 'foolz'
-        url = Redirect.path '//archive.foolz.us', 'foolfuuka', data
-      when 'u', 'kuku'
-        url = Redirect.path '//nsfw.foolz.us', 'foolfuuka', data
+      when 'a', 'co', 'gd', 'm', 'q', 'sp', 'tg', 'tv', 'vp', 'vr', 'wsg'
+        url = Redirect.path '//archive.foolz.us',           'foolfuuka', data
+      when 'u'
+        url = Redirect.path '//nsfw.foolz.us',              'foolfuuka', data
       when 'int', 'out', 'po'
-        url = Redirect.path '//archive.thedarkcave.org', 'foolfuuka', data
-      when 'ck', 'fa', 'jp', 'lit', 's4s'
-        url = Redirect.path '//fuuka.warosu.org', 'fuuka', data
-      when 'diy', 'sci'
-        url = Redirect.path '//archive.installgentoo.net', 'fuuka', data
-      when 'cgl', 'g', 'mu', 'w'
-        url = Redirect.path '//rbt.asia', 'fuuka', data
-      when 'an', 'fit', 'k', 'mlp', 'r9k', 'toy', 'x'
-        url = Redirect.path 'http://archive.heinessen.com', 'fuuka', data
-      when 'c'
-        url = Redirect.path '//archive.nyafuu.org', 'fuuka', data
+        url = Redirect.path '//archive.thedarkcave.org',    'foolfuuka', data
+      when 'hr', 'x'
+        url = Redirect.path 'http://archive.4plebs.org',    'foolfuuka', data
+      when 'c', 'w', 'wg'
+        url = Redirect.path '//archive.nyafuu.org',         'foolfuuka', data
+      when 'd', 'h', 'v'
+        url = Redirect.path '//loveisover.me',              'foolfuuka', data
+      when 'vg'
+        url = Redirect.path 'http://nth.pensivenonsen.se',  'foolfuuka', data
+      when 'adv', 'asp', 'cm', 'e', 'i', 'lgbt', 'n', 'o', 'p', 's', 's4s', 't', 'trv', 'y'
+        url = Redirect.path '//archive.foolzashit.com',       'foolfuuka', data
+      when 'diy', 'g', 'sci'
+        url = Redirect.path '//archive.installgentoo.net',  'fuuka',     data
+      when 'cgl', 'mu'
+        url = Redirect.path '//rbt.asia',                   'fuuka',     data
+      when 'an', 'fit', 'k', 'mlp', 'r9k', 'toy'
+        url = Redirect.path 'http://archive.heinessen.com', 'fuuka',     data
+      when '3', 'ck', 'fa', 'ic', 'jp', 'lit'
+        url = Redirect.path '//fuuka.warosu.org',           'fuuka',     data
       else
         if threadID
           url = "//boards.4chan.org/#{board}/"
@@ -4721,7 +4755,7 @@ Main =
     $.globalEval "(#{code})()".replace '_id_', bq.id
 
   namespace: '4chan_x.'
-  version: '2.39.4'
+  version: '2.39.6'
   callbacks: []
   css: '
 /* dialog styling */
