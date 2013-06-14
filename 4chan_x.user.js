@@ -6,12 +6,9 @@
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
 // @copyright      2012-2013 Nicolas Stepien <stepien.nicolas@gmail.com>
 // @license        MIT; http://en.wikipedia.org/wiki/Mit_license
-// @include        http://boards.4chan.org/*
-// @include        https://boards.4chan.org/*
-// @include        http://images.4chan.org/*
-// @include        https://images.4chan.org/*
-// @include        http://sys.4chan.org/*
-// @include        https://sys.4chan.org/*
+// @include        http*://boards.4chan.org/*
+// @include        http*://images.4chan.org/*
+// @include        http*://sys.4chan.org/*
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_deleteValue
@@ -136,7 +133,7 @@
       Posting: {
         'Quick Reply': [true, 'Reply without leaving the page'],
         'Cooldown': [true, 'Prevent "flood detected" errors'],
-        'Persistent QR': [false, 'The Quick reply won\'t disappear after posting'],
+        'Persistent QR': [true, 'The Quick reply won\'t disappear after posting'],
         'Auto Hide QR': [true, 'Automatically hide the quick reply when posting'],
         'Open Reply in New Tab': [false, 'Open replies in a new tab that are made from the main board'],
         'Remember QR size': [false, 'Remember the size of the Quick reply (Firefox only)'],
@@ -3397,6 +3394,9 @@
         textContent: Get.title(thread)
       };
       $.set('watched', watched);
+      $.event(Watcher.dialog, new CustomEvent('WatcherThreadAdded', {
+        bubbles: true
+      }));
       Watcher.refresh();
       return true;
     }

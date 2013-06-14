@@ -46,7 +46,7 @@ Config =
     Posting:
       'Quick Reply':                  [true,  'Reply without leaving the page']
       'Cooldown':                     [true,  'Prevent "flood detected" errors']
-      'Persistent QR':                [false, 'The Quick reply won\'t disappear after posting']
+      'Persistent QR':                [true,  'The Quick reply won\'t disappear after posting']
       'Auto Hide QR':                 [true,  'Automatically hide the quick reply when posting']
       'Open Reply in New Tab':        [false, 'Open replies in a new tab that are made from the main board']
       'Remember QR size':             [false, 'Remember the size of the Quick reply (Firefox only)']
@@ -2743,6 +2743,8 @@ Watcher =
       href: "/#{g.BOARD}/res/#{id}"
       textContent: Get.title thread
     $.set 'watched', watched
+    $.event Watcher.dialog, new CustomEvent 'WatcherThreadAdded',
+      bubbles: true
     Watcher.refresh()
     true
 

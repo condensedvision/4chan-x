@@ -13,12 +13,9 @@ HEADER  = """
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
 // @copyright      2012-2013 Nicolas Stepien <stepien.nicolas@gmail.com>
 // @license        MIT; http://en.wikipedia.org/wiki/Mit_license
-// @include        http://boards.4chan.org/*
-// @include        https://boards.4chan.org/*
-// @include        http://images.4chan.org/*
-// @include        https://images.4chan.org/*
-// @include        http://sys.4chan.org/*
-// @include        https://sys.4chan.org/*
+// @include        http*://boards.4chan.org/*
+// @include        http*://images.4chan.org/*
+// @include        http*://sys.4chan.org/*
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_deleteValue
