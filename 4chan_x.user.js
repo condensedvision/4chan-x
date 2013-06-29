@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.39.6
+// @version        2.39.7
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -24,7 +24,7 @@
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012-2013 Nicolas Stepien <stepien.nicolas@gmail.com>
  * http://mayhemydg.github.io/4chan-x/
- * 4chan X 2.39.6
+ * 4chan X 2.39.7
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -4908,6 +4908,7 @@
         case 'm':
         case 'q':
         case 'tg':
+        case 'vg':
         case 'vp':
         case 'vr':
         case 'wsg':
@@ -4928,8 +4929,6 @@
         case 'h':
         case 'v':
           return "//loveisover.me/" + board + "/full_image/" + filename;
-        case 'vg':
-          return "http://nth.pensivenonsen.se/" + board + "/full_image/" + filename;
         case 'adv':
         case 'asp':
         case 'cm':
@@ -4972,6 +4971,7 @@
         case 'sp':
         case 'tg':
         case 'tv':
+        case 'vg':
         case 'vp':
         case 'vr':
         case 'wsg':
@@ -4993,8 +4993,6 @@
         case 'h':
         case 'v':
           return "//loveisover.me/_/api/chan/post/?board=" + board + "&num=" + postID;
-        case 'vg':
-          return "http://nth.pensivenonsen.se/_/api/chan/post/?board=" + board + "&num=" + postID;
         case 'adv':
         case 'asp':
         case 'cm':
@@ -5004,6 +5002,7 @@
         case 'n':
         case 'o':
         case 'p':
+        case 'pol':
         case 's':
         case 's4s':
         case 't':
@@ -5027,6 +5026,7 @@
         case 'sp':
         case 'tg':
         case 'tv':
+        case 'vg':
         case 'vp':
         case 'vr':
         case 'wsg':
@@ -5054,9 +5054,6 @@
         case 'v':
           url = Redirect.path('//loveisover.me', 'foolfuuka', data);
           break;
-        case 'vg':
-          url = Redirect.path('http://nth.pensivenonsen.se', 'foolfuuka', data);
-          break;
         case 'adv':
         case 'asp':
         case 'cm':
@@ -5066,6 +5063,7 @@
         case 'n':
         case 'o':
         case 'p':
+        case 'pol':
         case 's':
         case 's4s':
         case 't':
@@ -5485,7 +5483,7 @@
 
   Main = {
     init: function() {
-      var key, path, pathname, settings, temp, val;
+      var asap, key, path, pathname, settings, temp, val;
       Main.flatten(null, Config);
       path = location.pathname;
       pathname = path.slice(1).split('/');
@@ -5505,10 +5503,13 @@
       switch (location.hostname) {
         case 'sys.4chan.org':
           if (/report/.test(location.search)) {
-            $.ready(function() {
+            asap = function() {
               var field, form;
+              if (!(field = $.id('recaptcha_response_field'))) {
+                setTimeout(asap, 200);
+                return;
+              }
               form = $('form');
-              field = $.id('recaptcha_response_field');
               $.on(field, 'keydown', function(e) {
                 if (e.keyCode === 8 && !e.target.value) {
                   return window.location = 'javascript:Recaptcha.reload()';
@@ -5523,7 +5524,8 @@
                 }
                 return form.submit();
               });
-            });
+            };
+            asap();
           }
           return;
         case 'images.4chan.org':
@@ -5894,7 +5896,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.39.6',
+    version: '2.39.7',
     callbacks: [],
     css: '\
 /* dialog styling */\
