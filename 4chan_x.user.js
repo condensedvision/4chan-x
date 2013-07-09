@@ -1741,7 +1741,8 @@
         thread = _ref[i];
         rect = thread.getBoundingClientRect();
         bottom = rect.bottom;
-        if (bottom > 0) {
+        console.log(bottom);
+        if (Math.floor(bottom) > 0) {
           if (full) {
             return [thread, i, rect];
           }
@@ -4905,6 +4906,7 @@
       switch (board) {
         case 'a':
         case 'gd':
+        case 'jp':
         case 'm':
         case 'q':
         case 'tg':
@@ -4966,6 +4968,7 @@
         case 'a':
         case 'co':
         case 'gd':
+        case 'jp':
         case 'm':
         case 'q':
         case 'sp':
@@ -5021,6 +5024,7 @@
         case 'a':
         case 'co':
         case 'gd':
+        case 'jp':
         case 'm':
         case 'q':
         case 'sp':

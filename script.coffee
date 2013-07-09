@@ -1343,7 +1343,8 @@ Nav =
     for thread, i in Nav.threads
       rect = thread.getBoundingClientRect()
       {bottom} = rect
-      if bottom > 0 #we have not scrolled past
+      console.log bottom
+      if Math.floor(bottom) > 0 #we have not scrolled past
         if full
           return [thread, i, rect]
         return thread
