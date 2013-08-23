@@ -4305,16 +4305,16 @@ ImageExpand =
   toggle: (a) ->
     thumb = a.firstChild
     if thumb.hidden
-      rect = a.getBoundingClientRect()
+      rect = a.parentNode.parentNode.getBoundingClientRect()
       if rect.bottom > 0 # should be at least partially visible.
         # Scroll back to the thumbnail when contracting the image
         # to avoid being left miles away from the relevant post.
         if $.engine is 'webkit'
-          d.body.scrollTop  += rect.top - 42 if rect.top < 0
-          d.body.scrollLeft += rect.left     if rect.left < 0
+          d.body.scrollTop  += rect.top  if rect.top < 0
+          d.body.scrollLeft += rect.left if rect.left < 0
         else
-          d.documentElement.scrollTop  += rect.top - 42 if rect.top < 0
-          d.documentElement.scrollLeft += rect.left     if rect.left < 0
+          d.documentElement.scrollTop  += rect.top  if rect.top < 0
+          d.documentElement.scrollLeft += rect.left if rect.left < 0
       ImageExpand.contract thumb
     else
       ImageExpand.expand thumb
