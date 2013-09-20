@@ -1454,18 +1454,21 @@ QR =
   cooldown:
     init: ->
       return unless Conf['Cooldown']
-      QR.cooldown.types =
-        thread: switch g.BOARD
-          when 'q' then 86400
-          when 'b', 'soc', 'r9k' then 600
-          else 300
-        sage: if g.BOARD is 'q' then 600 else 60
-        file: if g.BOARD is 'q' then 300 else 30
-        post: if g.BOARD is 'q' then 60  else 30
-      QR.cooldown.cooldowns = $.get "#{g.BOARD}.cooldown", {}
+      setTimers = (e) => QR.cooldown.types = e.detail
+      $.on window, 'cooldown:timers', setTimers
+      $.globalEval 'window.dispatchEvent(new CustomEvent("cooldown:timers", {detail: cooldowns}))'
+      QR.cooldown.types or= {} # XXX tmp workaround until all pages and the catalogs get the cooldowns var.
+      $.off window, 'cooldown:timers', setTimers
+      console.log QR.cooldown.types
+      for type of QR.cooldown.types
+        QR.cooldown.types[type] = +QR.cooldown.types[type]
+      key = "#{g.BOARD}.cooldown"
+      QR.cooldown.cooldowns = $.get key, {}
       QR.cooldown.start()
-      $.sync "#{g.BOARD}.cooldown", QR.cooldown.sync
+      console.log QR.cooldown.cooldowns
+      $.sync key, QR.cooldown.sync
     start: ->
+      return unless Conf['Cooldown']
       return if QR.cooldown.isCounting
       QR.cooldown.isCounting = true
       QR.cooldown.count()
@@ -1481,43 +1484,36 @@ QR =
       if data.delay
         cooldown = delay: data.delay
       else
-        isSage  = /sage/i.test data.post.email
         hasFile = !!data.post.file
         isReply = data.isReply
-        type =
-          unless isReply
-            'thread'
-          else if isSage
-            'sage'
-          else if hasFile
-            'file'
-          else
-            'post'
+        threadID = data.threadID
         cooldown =
           isReply: isReply
-          isSage:  isSage
           hasFile: hasFile
-          timeout: start + QR.cooldown.types[type] * $.SECOND
+          threadID: threadID
       QR.cooldown.cooldowns[start] = cooldown
       $.set "#{g.BOARD}.cooldown", QR.cooldown.cooldowns
       QR.cooldown.start()
     unset: (id) ->
       delete QR.cooldown.cooldowns[id]
-      $.set "#{g.BOARD}.cooldown", QR.cooldown.cooldowns
-    count: ->
       if Object.keys(QR.cooldown.cooldowns).length
-        setTimeout QR.cooldown.count, 1000
+        $.set "#{g.BOARD}.cooldown", QR.cooldown.cooldowns
       else
+        $.delete "#{g.BOARD}.cooldown"
+    count: ->
+      unless Object.keys(QR.cooldown.cooldowns).length
         $.delete "#{g.BOARD}.cooldown"
         delete QR.cooldown.isCounting
         delete QR.cooldown.seconds
         QR.status()
         return
 
-      if (isReply = if g.REPLY then true else QR.threadSelector.value isnt 'new')
-        post    = QR.replies[0]
-        isSage  = /sage/i.test post.email
-        hasFile = !!post.file
+      clearTimeout QR.cooldown.timeout
+      QR.cooldown.timeout = setTimeout QR.cooldown.count, 1000
+
+      isReply = if g.REPLY then true else QR.threadSelector.value isnt 'new'
+      post    = QR.replies[0]
+      hasFile = !!post.file
       now     = Date.now()
       seconds = null
       {types, cooldowns} = QR.cooldown
@@ -1532,22 +1528,25 @@ QR =
           continue
 
         if isReply is cooldown.isReply
-          # Only cooldowns relevant to this post can set the seconds value.
-          # Unset outdated cooldowns that can no longer impact us.
-          type =
-            unless isReply
-              'thread'
-            else if isSage and cooldown.isSage
-              'sage'
-            else if hasFile and cooldown.hasFile
-              'file'
-            else
-              'post'
-          elapsed = Math.floor (now - start) / 1000
-          if elapsed >= 0 # clock changed since then?
-            seconds = Math.max seconds, types[type] - elapsed
-        unless start <= now <= cooldown.timeout
-          QR.cooldown.unset start
+          # Only cooldowns relevant to this post can set the seconds variable:
+          # reply cooldown with a reply, thread cooldown with a thread
+          elapsed = Math.floor (now - start) / $.SECOND
+          continue if elapsed < 0 # clock changed since then?
+          unless isReply
+            type = 'thread'
+          else if hasFile
+            # You can post an image reply immediately after a non-image reply.
+            unless cooldown.hasFile
+              seconds = Math.max seconds, 0
+              continue
+            type = 'image'
+          else
+            type = 'reply'
+          maxTimer = Math.max types[type] or 0, types[type + '_intra'] or 0
+          unless start <= now <= +start + maxTimer * $.SECOND
+            QR.cooldown.unset start
+          type += '_intra' if isReply and (g.THREAD_ID or QR.threadSelector.value) is cooldown.threadID
+          seconds = Math.max seconds, types[type] - elapsed
 
       # Update the status when we change posting type.
       # Don't get stuck at some random number.
@@ -2118,6 +2117,7 @@ QR =
     QR.cooldown.set
       post:    reply
       isReply: threadID isnt '0'
+      threadID: threadID
 
     if threadID is '0' # new thread
       # auto-noko

@@ -1877,31 +1877,32 @@
     },
     cooldown: {
       init: function() {
+        var key, setTimers, type, _base,
+          _this = this;
         if (!Conf['Cooldown']) {
           return;
         }
-        QR.cooldown.types = {
-          thread: (function() {
-            switch (g.BOARD) {
-              case 'q':
-                return 86400;
-              case 'b':
-              case 'soc':
-              case 'r9k':
-                return 600;
-              default:
-                return 300;
-            }
-          })(),
-          sage: g.BOARD === 'q' ? 600 : 60,
-          file: g.BOARD === 'q' ? 300 : 30,
-          post: g.BOARD === 'q' ? 60 : 30
+        setTimers = function(e) {
+          return QR.cooldown.types = e.detail;
         };
-        QR.cooldown.cooldowns = $.get("" + g.BOARD + ".cooldown", {});
+        $.on(window, 'cooldown:timers', setTimers);
+        $.globalEval('window.dispatchEvent(new CustomEvent("cooldown:timers", {detail: cooldowns}))');
+        (_base = QR.cooldown).types || (_base.types = {});
+        $.off(window, 'cooldown:timers', setTimers);
+        console.log(QR.cooldown.types);
+        for (type in QR.cooldown.types) {
+          QR.cooldown.types[type] = +QR.cooldown.types[type];
+        }
+        key = "" + g.BOARD + ".cooldown";
+        QR.cooldown.cooldowns = $.get(key, {});
         QR.cooldown.start();
-        return $.sync("" + g.BOARD + ".cooldown", QR.cooldown.sync);
+        console.log(QR.cooldown.cooldowns);
+        return $.sync(key, QR.cooldown.sync);
       },
       start: function() {
+        if (!Conf['Cooldown']) {
+          return;
+        }
         if (QR.cooldown.isCounting) {
           return;
         }
@@ -1916,7 +1917,7 @@
         return QR.cooldown.start();
       },
       set: function(data) {
-        var cooldown, hasFile, isReply, isSage, start, type;
+        var cooldown, hasFile, isReply, start, threadID;
         if (!Conf['Cooldown']) {
           return;
         }
@@ -1926,15 +1927,13 @@
             delay: data.delay
           };
         } else {
-          isSage = /sage/i.test(data.post.email);
           hasFile = !!data.post.file;
           isReply = data.isReply;
-          type = !isReply ? 'thread' : isSage ? 'sage' : hasFile ? 'file' : 'post';
+          threadID = data.threadID;
           cooldown = {
             isReply: isReply,
-            isSage: isSage,
             hasFile: hasFile,
-            timeout: start + QR.cooldown.types[type] * $.SECOND
+            threadID: threadID
           };
         }
         QR.cooldown.cooldowns[start] = cooldown;
@@ -1943,24 +1942,26 @@
       },
       unset: function(id) {
         delete QR.cooldown.cooldowns[id];
-        return $.set("" + g.BOARD + ".cooldown", QR.cooldown.cooldowns);
+        if (Object.keys(QR.cooldown.cooldowns).length) {
+          return $.set("" + g.BOARD + ".cooldown", QR.cooldown.cooldowns);
+        } else {
+          return $["delete"]("" + g.BOARD + ".cooldown");
+        }
       },
       count: function() {
-        var cooldown, cooldowns, elapsed, hasFile, isReply, isSage, now, post, seconds, start, type, types, update, _ref;
-        if (Object.keys(QR.cooldown.cooldowns).length) {
-          setTimeout(QR.cooldown.count, 1000);
-        } else {
+        var cooldown, cooldowns, elapsed, hasFile, isReply, maxTimer, now, post, seconds, start, type, types, update, _ref;
+        if (!Object.keys(QR.cooldown.cooldowns).length) {
           $["delete"]("" + g.BOARD + ".cooldown");
           delete QR.cooldown.isCounting;
           delete QR.cooldown.seconds;
           QR.status();
           return;
         }
-        if ((isReply = g.REPLY ? true : QR.threadSelector.value !== 'new')) {
-          post = QR.replies[0];
-          isSage = /sage/i.test(post.email);
-          hasFile = !!post.file;
-        }
+        clearTimeout(QR.cooldown.timeout);
+        QR.cooldown.timeout = setTimeout(QR.cooldown.count, 1000);
+        isReply = g.REPLY ? true : QR.threadSelector.value !== 'new';
+        post = QR.replies[0];
+        hasFile = !!post.file;
         now = Date.now();
         seconds = null;
         _ref = QR.cooldown, types = _ref.types, cooldowns = _ref.cooldowns;
@@ -1976,14 +1977,29 @@
             continue;
           }
           if (isReply === cooldown.isReply) {
-            type = !isReply ? 'thread' : isSage && cooldown.isSage ? 'sage' : hasFile && cooldown.hasFile ? 'file' : 'post';
-            elapsed = Math.floor((now - start) / 1000);
-            if (elapsed >= 0) {
-              seconds = Math.max(seconds, types[type] - elapsed);
+            elapsed = Math.floor((now - start) / $.SECOND);
+            if (elapsed < 0) {
+              continue;
             }
-          }
-          if (!((start <= now && now <= cooldown.timeout))) {
-            QR.cooldown.unset(start);
+            if (!isReply) {
+              type = 'thread';
+            } else if (hasFile) {
+              if (!cooldown.hasFile) {
+                seconds = Math.max(seconds, 0);
+                continue;
+              }
+              type = 'image';
+            } else {
+              type = 'reply';
+            }
+            maxTimer = Math.max(types[type] || 0, types[type + '_intra'] || 0);
+            if (!((start <= now && now <= +start + maxTimer * $.SECOND))) {
+              QR.cooldown.unset(start);
+            }
+            if (isReply && (g.THREAD_ID || QR.threadSelector.value) === cooldown.threadID) {
+              type += '_intra';
+            }
+            seconds = Math.max(seconds, types[type] - elapsed);
           }
         }
         update = seconds !== null || !!QR.cooldown.seconds;
@@ -2654,7 +2670,8 @@
       }));
       QR.cooldown.set({
         post: reply,
-        isReply: threadID !== '0'
+        isReply: threadID !== '0',
+        threadID: threadID
       });
       if (threadID === '0') {
         location.pathname = "/" + g.BOARD + "/res/" + postID;
