@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.39.8
+// @version        2.39.9
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -24,7 +24,7 @@
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012-2013 Nicolas Stepien <stepien.nicolas@gmail.com>
  * http://mayhemydg.github.io/4chan-x/
- * 4chan X 2.39.8
+ * 4chan X 2.39.9
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -578,7 +578,7 @@
   Filter = {
     filters: {},
     init: function() {
-      var boards, filter, hl, key, op, regexp, stub, top, _i, _len, _ref, _ref1, _ref2, _ref3, _ref4;
+      var boards, err, filter, hl, key, op, regexp, stub, top, _i, _len, _ref, _ref1, _ref2, _ref3, _ref4;
       for (key in Config.filter) {
         this.filters[key] = [];
         _ref = Conf[key].split('\n');
@@ -600,7 +600,8 @@
           } else {
             try {
               regexp = RegExp(regexp[1], regexp[2]);
-            } catch (err) {
+            } catch (_error) {
+              err = _error;
               alert(err.message);
               continue;
             }
@@ -1889,14 +1890,12 @@
         $.globalEval('window.dispatchEvent(new CustomEvent("cooldown:timers", {detail: cooldowns}))');
         (_base = QR.cooldown).types || (_base.types = {});
         $.off(window, 'cooldown:timers', setTimers);
-        console.log(QR.cooldown.types);
         for (type in QR.cooldown.types) {
           QR.cooldown.types[type] = +QR.cooldown.types[type];
         }
         key = "" + g.BOARD + ".cooldown";
         QR.cooldown.cooldowns = $.get(key, {});
         QR.cooldown.start();
-        console.log(QR.cooldown.cooldowns);
         return $.sync(key, QR.cooldown.sync);
       },
       start: function() {
@@ -2103,7 +2102,6 @@
     },
     replies: [],
     reply: (function() {
-
       function _Class() {
         var persona, prev,
           _this = this;
@@ -3065,14 +3063,15 @@
       }
       reader = new FileReader();
       reader.onload = function(e) {
-        var data;
+        var data, err;
         try {
           data = JSON.parse(e.target.result);
           Options.loadSettings(data);
           if (confirm('Import successful. Refresh now?')) {
             return window.location.reload();
           }
-        } catch (err) {
+        } catch (_error) {
+          err = _error;
           return output.textContent = 'Import failed due to an error.';
         }
       };
@@ -3139,8 +3138,8 @@
       return $.on(d, 'visibilitychange', this.cb.visibility);
     },
     /*
-      http://freesound.org/people/pierrecartoons1979/sounds/90112/
-      cc-by-nc-3.0
+    http://freesound.org/people/pierrecartoons1979/sounds/90112/
+    cc-by-nc-3.0
     */
 
     audio: $.el('audio', {
@@ -3211,9 +3210,9 @@
           case 0:
           case 304:
             /*
-                      Status Code 304: Not modified
-                      By sending the `If-Modified-Since` header we get a proper status code, and no response.
-                      This saves bandwidth for both the user and the servers and avoid unnecessary computation.
+            Status Code 304: Not modified
+            By sending the `If-Modified-Since` header we get a proper status code, and no response.
+            This saves bandwidth for both the user and the servers and avoid unnecessary computation.
             */
 
             Updater.set('timer', -Conf['Interval']);
@@ -3695,13 +3694,13 @@
       return Main.callbacks.push(this.node);
     },
     node: function(post) {
-      var alt, filename, node, _ref;
+      var alt, filename, node;
       if (post.isInlined && !post.isCrosspost || !post.fileInfo) {
         return;
       }
-      node = post.fileInfo.firstElementChild;
+      node = post.fileInfo;
       alt = post.img.alt;
-      filename = ((_ref = $('span', node)) != null ? _ref.title : void 0) || node.title;
+      filename = $('span', node).textContent;
       FileInfo.data = {
         link: post.img.parentNode.href,
         spoiler: /^Spoiler/.test(alt),
@@ -4043,8 +4042,8 @@
     },
     post: function(o, isArchived) {
       /*
-          This function contains code from 4chan-JS (https://github.com/4chan/4chan-JS).
-          @license: https://github.com/4chan/4chan-JS/blob/master/LICENSE
+      This function contains code from 4chan-JS (https://github.com/4chan/4chan-JS).
+      @license: https://github.com/4chan/4chan-JS/blob/master/LICENSE
       */
 
       var a, board, capcode, capcodeClass, capcodeStart, closed, comment, container, date, dateUTC, email, emailEnd, emailStart, ext, file, fileDims, fileHTML, fileInfo, fileSize, fileThumb, filename, flag, flagCode, flagName, href, imgSrc, isClosed, isOP, isSticky, name, postID, quote, shortFilename, spoilerRange, staticPath, sticky, subject, threadID, tripcode, uniqueID, userID, _i, _len, _ref;
@@ -4608,7 +4607,7 @@
     cooldown: {
       start: function(e) {
         var seconds;
-        seconds = g.BOARD === 'q' ? 600 : 30;
+        seconds = 60;
         return DeleteLink.cooldown.count(e.detail.postID, seconds, seconds);
       },
       count: function(postID, seconds, length) {
@@ -5860,7 +5859,7 @@
       return post;
     },
     node: function(nodes, notify) {
-      var callback, node, _i, _j, _len, _len1, _ref;
+      var callback, err, node, _i, _j, _len, _len1, _ref;
       _ref = Main.callbacks;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         callback = _ref[_i];
@@ -5869,7 +5868,8 @@
             node = nodes[_j];
             callback(node);
           }
-        } catch (err) {
+        } catch (_error) {
+          err = _error;
           if (notify) {
             alert("4chan X (" + Main.version + ") error: " + err.message + "\nReport the bug at mayhemydg.github.io/4chan-x/#bug-report\n\nURL: " + window.location + "\n" + err.stack);
           }
@@ -5916,7 +5916,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.39.8',
+    version: '2.39.9',
     callbacks: [],
     css: '\
 /* dialog styling */\

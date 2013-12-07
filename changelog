@@ -1,6 +1,16 @@
 master
 
+2.39.9
+
 2.39.8
+- Ahoka
+  Ported Mayhem's posting cooldown changes.
+  Update posting cooldown timers to match 4chan settings:
+    Cooldown may vary between inter-thread and intra-thread replies.
+    Cooldown may vary when posting a file or not.
+    Cooldown does not take sageing into account anymore.
+    You can post an image reply immediately after a non-image reply.
+    Timers vary across boards.
 
 2.39.7
 - Mayhem
@@ -10,7 +20,7 @@ master
 - Mayhem
   Fix QR.
 - Ahoka
-	Add custom event for when a thread is watched.
+  Add custom event for when a thread is watched.
 
 2.39.5
 - Mayhem
@@ -1099,7 +1109,7 @@ mayhem:
 - keybinds
     - add u - update now
     - remove hHlLjk, numerical prefixes
-	- use [vimus](http://userscripts.org/scripts/show/93187) for non-chan keybinds
+  - use [vimus](http://userscripts.org/scripts/show/93187) for non-chan keybinds
 - fix slow scrolling
 - add replies in original order so backlinks resolve properly
 - fix qr quoting
@@ -1125,12 +1135,12 @@ mayhem:
 - body { padding-bottom } when Thread Navigation
 - keybinds
     - insert mode
-	^s - quick spoiler
-	escape - remove quick reply
+  ^s - quick spoiler
+  escape - remove quick reply
     - normal mode
-	h/l - scroll left/right, H/L - move pages
-	m/M - expand selected / all images
-	w - watch thread (changed from m)
+  h/l - scroll left/right, H/L - move pages
+  m/M - expand selected / all images
+  w - watch thread (changed from m)
 
 1.17.5
 - fix threading

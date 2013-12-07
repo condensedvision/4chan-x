@@ -1459,13 +1459,11 @@ QR =
       $.globalEval 'window.dispatchEvent(new CustomEvent("cooldown:timers", {detail: cooldowns}))'
       QR.cooldown.types or= {} # XXX tmp workaround until all pages and the catalogs get the cooldowns var.
       $.off window, 'cooldown:timers', setTimers
-      console.log QR.cooldown.types
       for type of QR.cooldown.types
         QR.cooldown.types[type] = +QR.cooldown.types[type]
       key = "#{g.BOARD}.cooldown"
       QR.cooldown.cooldowns = $.get key, {}
       QR.cooldown.start()
-      console.log QR.cooldown.cooldowns
       $.sync key, QR.cooldown.sync
     start: ->
       return unless Conf['Cooldown']
@@ -2979,9 +2977,9 @@ FileInfo =
     Main.callbacks.push @node
   node: (post) ->
     return if post.isInlined and not post.isCrosspost or not post.fileInfo
-    node = post.fileInfo.firstElementChild
+    node = post.fileInfo
     alt  = post.img.alt
-    filename = $('span', node)?.title or node.title
+    filename = $('span', node).textContent
     FileInfo.data =
       link:       post.img.parentNode.href
       spoiler:    /^Spoiler/.test alt
@@ -3811,11 +3809,7 @@ DeleteLink =
 
   cooldown:
     start: (e) ->
-      seconds =
-        if g.BOARD is 'q'
-          600
-        else
-          30
+      seconds = 60
       DeleteLink.cooldown.count e.detail.postID, seconds, seconds
     count: (postID, seconds, length) ->
       return unless 0 <= seconds <= length
@@ -4752,7 +4746,7 @@ Main =
     $.globalEval "(#{code})()".replace '_id_', bq.id
 
   namespace: '4chan_x.'
-  version: '2.39.8'
+  version: '2.39.9'
   callbacks: []
   css: '
 /* dialog styling */
