@@ -2979,7 +2979,7 @@ FileInfo =
     return if post.isInlined and not post.isCrosspost or not post.fileInfo
     node = post.fileInfo
     alt  = post.img.alt
-    filename = $('span', node)?.title || $('span', node)?.textContent || node.title
+    filename = $('span[title]', node)?.title || $('span', node)?.textContent || node.title
     FileInfo.data =
       link:       post.img.parentNode.href
       spoiler:    /^Spoiler/.test alt
@@ -4715,6 +4715,7 @@ Main =
       imgParent = img.parentNode
       post.img      = img
       post.fileInfo = imgParent.previousElementSibling
+      post.fileInfo.className = "fileText"
       post.hasPdf   = /\.pdf$/.test imgParent.href
     Main.prettify post.blockquote
     post

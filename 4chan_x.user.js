@@ -3700,7 +3700,7 @@
       }
       node = post.fileInfo;
       alt = post.img.alt;
-      filename = ((_ref = $('span', node)) != null ? _ref.title : void 0) || ((_ref1 = $('span', node)) != null ? _ref1.textContent : void 0) || node.title;
+      filename = ((_ref = $('span[title]', node)) != null ? _ref.title : void 0) || ((_ref1 = $('span', node)) != null ? _ref1.textContent : void 0) || node.title;
       FileInfo.data = {
         link: post.img.parentNode.href,
         spoiler: /^Spoiler/.test(alt),
@@ -5853,6 +5853,7 @@
         imgParent = img.parentNode;
         post.img = img;
         post.fileInfo = imgParent.previousElementSibling;
+        post.fileInfo.className = "fileText";
         post.hasPdf = /\.pdf$/.test(imgParent.href);
       }
       Main.prettify(post.blockquote);
