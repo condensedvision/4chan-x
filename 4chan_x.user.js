@@ -3694,13 +3694,13 @@
       return Main.callbacks.push(this.node);
     },
     node: function(post) {
-      var alt, filename, node, _ref;
+      var alt, filename, node, _ref, _ref1;
       if (post.isInlined && !post.isCrosspost || !post.fileInfo) {
         return;
       }
       node = post.fileInfo;
       alt = post.img.alt;
-      filename = ((_ref = $('span', node)) != null ? _ref.textContent : void 0) || node.title;
+      filename = ((_ref = $('span', node)) != null ? _ref.title : void 0) || ((_ref1 = $('span', node)) != null ? _ref1.textContent : void 0) || node.title;
       FileInfo.data = {
         link: post.img.parentNode.href,
         spoiler: /^Spoiler/.test(alt),
@@ -5916,7 +5916,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.39.10',
+    version: '2.39.9',
     callbacks: [],
     css: '\
 /* dialog styling */\
