@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.39.9
+// @version        2.39.10
 // @namespace      aeosynth
 // @description    Adds various features.
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -24,7 +24,7 @@
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012-2013 Nicolas Stepien <stepien.nicolas@gmail.com>
  * http://mayhemydg.github.io/4chan-x/
- * 4chan X 2.39.9
+ * 4chan X 2.39.10
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -3694,13 +3694,13 @@
       return Main.callbacks.push(this.node);
     },
     node: function(post) {
-      var alt, filename, node;
+      var alt, filename, node, _ref;
       if (post.isInlined && !post.isCrosspost || !post.fileInfo) {
         return;
       }
       node = post.fileInfo;
       alt = post.img.alt;
-      filename = $('span', node).textContent;
+      filename = ((_ref = $('span', node)) != null ? _ref.textContent : void 0) || node.title;
       FileInfo.data = {
         link: post.img.parentNode.href,
         spoiler: /^Spoiler/.test(alt),
@@ -5916,7 +5916,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.39.9',
+    version: '2.39.10',
     callbacks: [],
     css: '\
 /* dialog styling */\
