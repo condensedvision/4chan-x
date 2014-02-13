@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.39.10
-// @namespace      aeosynth
-// @description    Adds various features.
+// @version        2.40.0
+// @namespace      com.whatisthisimnotgoodwithcomputers.4chanx
+// @description    4chan x forked from ahodesuka, maintained (as far as possible) by WhatIsThisImNotGoodWithComputers
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
 // @copyright      2012-2013 Nicolas Stepien <stepien.nicolas@gmail.com>
+// @copyright      2014	WhatIsThisImNotGoodWithComputers <ohgod@whatisthisimnotgoodwithcomputers.com>
 // @license        MIT; http://en.wikipedia.org/wiki/Mit_license
 // @include        http*://boards.4chan.org/*
 // @include        http*://images.4chan.org/*
@@ -14,8 +15,8 @@
 // @grant          GM_deleteValue
 // @grant          GM_openInTab
 // @run-at         document-start
-// @updateURL      https://github.com/ahodesuka/4chan-x/raw/stable/4chan_x.user.js
-// @downloadURL    https://github.com/ahodesuka/4chan-x/raw/stable/4chan_x.user.js
+// @updateURL      https://github.com/WhatIsThisImNotGoodWithComputers/4chan-x/raw/master/4chan_x.user.js
+// @downloadURL    https://github.com/WhatIsThisImNotGoodWithComputers/4chan-x/raw/master/4chan_x.user.js
 // @icon           data:image/gif;base64,R0lGODlhEAAQAKECAAAAAGbMM////////yH5BAEKAAIALAAAAAAQABAAAAIxlI+pq+D9DAgUoFkPDlbs7lGiI2bSVnKglnJMOL6omczxVZK3dH/41AG6Lh7i6qUoAAA7
 // ==/UserScript==
 
@@ -23,8 +24,11 @@
  *
  * Copyright (c) 2009-2011 James Campos <james.r.campos@gmail.com>
  * Copyright (c) 2012-2013 Nicolas Stepien <stepien.nicolas@gmail.com>
+ * Copyright (c) 2014	   WhatIsThisImNotGoodWithComputers <ohgod@whatisthisimnotgoodwithcomputers.com>
  * http://mayhemydg.github.io/4chan-x/
  * 4chan X 2.39.10
+ * Forked to https://github.com/WhatIsThisImNotGoodWithComputers/4chan-x
+ * 4chan X 2.40.0
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -53,6 +57,10 @@
  * [1]: http://coffeescript.org/
  * [2]: https://github.com/MayhemYDG/4chan-x
  *
+ * Forked 4chan x by WhatIsThisImNotGoodWithComputers is the userscript edited directly and developed on GitHub [3].
+ *
+ * [3]: https://github.com/WhatIsThisImNotGoodWithComputers/4chan-x
+ *
  * CONTRIBUTORS
  *
  * noface - unique ID fixes
@@ -71,6 +79,7 @@
  * herpaderpderp - recaptcha fixes
  * WakiMiko - recaptcha tab order http://userscripts.org/scripts/show/82657
  * btmcsweeney - allow users to specify text for sauce links
+ * WhatIsThisImNotGoodWithComputers - recaptcha fix (feb 2014)
  *
  * All the people who've taken the time to write bug reports.
  *
@@ -2404,7 +2413,7 @@
 <form>\
   <div><input id=dump type=button title="Dump list" value=+ class=field><input name=name title=Name placeholder=Name class=field size=1><input name=email title=E-mail placeholder=E-mail class=field size=1><input name=sub title=Subject placeholder=Subject class=field size=1></div>\
   <div id=replies><div><a id=addReply href=javascript:; title="Add a reply">+</a></div></div>\
-  <div class=textarea><textarea name=com title=Comment placeholder=Comment class=field></textarea><span id=charCount></span></div>\
+  <div class=textarea><textarea name=com title=Comment placeholder=Comment class=field id=commentTextArea></textarea><span id=charCount></span></div>\
   <div><input type=file title="Shift+Click to remove the selected file." multiple size=16><input type=submit></div>\
   <label id=spoilerLabel><input type=checkbox id=spoiler> Spoiler Image</label>\
   <div class=warning></div>\
@@ -2464,6 +2473,10 @@
       $.on($('#addReply', QR.el), 'click', function() {
         return new QR.reply().select();
       });
+	  $.on($('#commentTextArea', QR.el), 'click', function() {
+		$.globalEval('javascript:loadRecaptcha();');
+      });
+	  
       $.on($('form', QR.el), 'submit', QR.submit);
       $.on(ta, 'input', function() {
         return QR.selected.el.lastChild.textContent = this.value;
@@ -2491,6 +2504,7 @@
           }
         });
       }
+	  
       QR.status.input = $('input[type=submit]', QR.el);
       QR.status();
       QR.cooldown.init();
@@ -2741,9 +2755,9 @@
         className: 'reply dialog',
         innerHTML: '<div id=optionsbar>\
   <div id=credits>\
-    <a target=_blank href=http://mayhemydg.github.io/4chan-x/>4chan X</a>\
-    | <a target=_blank href=https://raw.github.com/mayhemydg/4chan-x/master/changelog>' + Main.version + '</a>\
-    | <a target=_blank href=http://mayhemydg.github.io/4chan-x/#bug-report>Issues</a>\
+    <a target=_blank href=https://github.com/WhatIsThisImNotGoodWithComputers/4chan-x>4chan X</a>\
+    | <a target=_blank href=https://github.com/WhatIsThisImNotGoodWithComputers/4chan-x>' + Main.version + '</a>\
+    | <a target=_blank href=https://github.com/WhatIsThisImNotGoodWithComputers/4chan-x>Issues</a>\
   </div>\
   <div>\
     <label for=main_tab>Main</label>\
@@ -5608,7 +5622,7 @@
           $.on(window, 'message', Main.message);
           $.set('lastUpdate', now);
           return $.add(d.head, $.el('script', {
-            src: 'https://github.com/ahodesuka/4chan-x/raw/master/latest.js'
+            src: 'https://raw2.github.com/WhatIsThisImNotGoodWithComputers/4chan-x/master/latest.js'
           }));
         });
       }
@@ -5827,7 +5841,7 @@
       var version;
       version = e.data.version;
       if (version && version !== Main.version && confirm('An updated version of 4chan X is available, would you like to install it now?')) {
-        return window.location = "https://raw.github.com/ahodesuka/4chan-x/" + version + "/4chan_x.user.js";
+        return window.location = "https://raw.github.com/WhatIsThisImNotGoodWithComputers//4chan-x/" + version + "/4chan_x.user.js";
       }
     },
     preParse: function(node) {
@@ -5917,7 +5931,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.39.9',
+    version: '2.40.0',
     callbacks: [],
     css: '\
 /* dialog styling */\
