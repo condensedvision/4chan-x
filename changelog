@@ -1,5 +1,9 @@
 master
 
+2.40.1
+- Some anon
+  Fixed some mimeTypes error.
+
 2.40.0
 - WhatIsThisImNotGoodWithComputers
   Captcha fix (feb 2014)

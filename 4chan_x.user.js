@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.40.0
+// @version        2.40.1
 // @namespace      com.whatisthisimnotgoodwithcomputers.4chanx
 // @description    4chan x forked from ahodesuka, maintained (as far as possible) by WhatIsThisImNotGoodWithComputers
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -28,7 +28,7 @@
  * http://mayhemydg.github.io/4chan-x/
  * 4chan X 2.39.10
  * Forked to https://github.com/WhatIsThisImNotGoodWithComputers/4chan-x
- * 4chan X 2.40.0
+ * 4chan X 2.40.0 - 2.40.1
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -1773,6 +1773,8 @@
   };
 
   QR = {
+	//applied fix an anon posted on /g/
+	mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'application/x-shockwave-flash', ''],
     init: function() {
       if (!$.id('postForm')) {
         return;
@@ -2424,6 +2426,8 @@
         });
         ta.style.cssText = $.get('QR.size', '');
       }
+      //applied fix an anon posted on /g/
+      /*
       mimeTypes = $('ul.rules').firstElementChild.textContent.trim().match(/: (.+)/)[1].toLowerCase().replace(/\w+/g, function(type) {
         switch (type) {
           case 'jpg':
@@ -2438,6 +2442,7 @@
       });
       QR.mimeTypes = mimeTypes.split(', ');
       QR.mimeTypes.push('');
+      */
       fileInput = $('input[type=file]', QR.el);
       fileInput.max = $('input[name=MAX_FILE_SIZE]').value;
       if ($.engine !== 'presto') {
@@ -5931,7 +5936,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.40.0',
+    version: '2.40.1',
     callbacks: [],
     css: '\
 /* dialog styling */\
