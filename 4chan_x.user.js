@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           4chan x
-// @version        2.40.1
+// @version        2.40.2
 // @namespace      com.whatisthisimnotgoodwithcomputers.4chanx
 // @description    4chan x forked from ahodesuka, maintained (as far as possible) by WhatIsThisImNotGoodWithComputers
 // @copyright      2009-2011 James Campos <james.r.campos@gmail.com>
@@ -28,7 +28,7 @@
  * http://mayhemydg.github.io/4chan-x/
  * 4chan X 2.39.10
  * Forked to https://github.com/WhatIsThisImNotGoodWithComputers/4chan-x
- * 4chan X 2.40.0 - 2.40.1
+ * 4chan X 2.40.0 - 2.40.2
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -87,8 +87,11 @@
  */
 
 (function() {
-  var $, $$, Anonymize, ArchiveLink, AutoGif, Build, CatalogLinks, Conf, Config, DeleteLink, DownloadLink, ExpandComment, ExpandThread, Favicon, FileInfo, Filter, Get, ImageExpand, ImageHover, Keybinds, Main, Menu, Nav, Options, PngFix, QR, QuoteBacklink, QuoteCT, QuoteInline, QuoteOP, QuotePreview, Quotify, Redirect, RelativeDates, ReplyHiding, ReportLink, RevealSpoilers, Sauce, StrikethroughQuotes, ThreadHiding, ThreadStats, Time, TitlePost, UI, Unread, Updater, Watcher, d, g;
+  var $, $$, Anonymize, ArchiveLink, AutoGif, Build, CatalogLinks, Conf, Config, DeleteLink, DownloadLink, ExpandComment, ExpandThread, Favicon, FileInfo, Filter, Get, ImageExpand, ImageHover, Keybinds, Main, Menu, Nav, Options, PngFix, QR, QuoteBacklink, QuoteCT, QuoteInline, QuoteYou, QuoteOP, QuotePreview, Quotify, Redirect, RelativeDates, ReplyHiding, ReportLink, RevealSpoilers, Sauce, StrikethroughQuotes, ThreadHiding, ThreadStats, Time, TitlePost, UI, Unread, Updater, Watcher, d, g;
 
+  //Your posts to add (You) backlinks to
+  var yourPosts = new Array();
+  
   Config = {
     main: {
       Enhancing: {
@@ -152,7 +155,8 @@
       },
       Quoting: {
         'Quote Backlinks': [true, 'Add quote backlinks'],
-        'OP Backlinks': [false, 'Add backlinks to the OP'],
+        //Add (You) to OP feature (this edits the text in the settings only)
+        'OP Backlinks': [false, 'Add backlinks to the OP and enable You posts'],
         'Quote Highlighting': [true, 'Highlight the previewed post'],
         'Quote Inline': [true, 'Show quoted post inline on quote click'],
         'Quote Preview': [true, 'Show quote content on hover'],
@@ -960,6 +964,8 @@
       }
       if (Conf['Indicate OP quote']) {
         QuoteOP.node(post);
+        // Also add (You) links to posts
+        QuoteYou.node(post);
       }
       if (Conf['Indicate Cross-thread Quotes']) {
         QuoteCT.node(post);
@@ -2685,6 +2691,12 @@
           postID: postID
         }
       }));
+      
+      //Add your postID to yourPosts list
+      yourPosts.push(postID);
+      //Add to session storage
+      sessionStorage.setItem('yourPosts', JSON.stringify(yourPosts));
+      
       QR.cooldown.set({
         post: reply,
         isReply: threadID !== '0',
@@ -4425,6 +4437,34 @@
       return $.off(this, 'mouseout click', QuotePreview.mouseout);
     }
   };
+  
+  //Add (You) to posts function
+  QuoteYou = {
+    init: function() {
+      return Main.callbacks.push(this.node);
+    },
+    node: function(post) {
+      var quote, _i, _len, _ref;
+      if (post.isInlined && !post.isCrosspost) {
+        return;
+      }
+      _ref = post.quotes;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        quote = _ref[_i];
+        //Loop through locally stored post numbers
+        yourPostsFromStorage = JSON.parse(sessionStorage.getItem('yourPosts'));
+        //Check not null
+        if (yourPostsFromStorage) {
+			var yourPostsFromStorageLength = yourPostsFromStorage.length;
+			for (var tempI = 0; tempI < yourPostsFromStorageLength; tempI++) {
+				if (quote.hash.slice(2) === yourPostsFromStorage[tempI]) {
+					$.add(quote, $.tn('\u00A0(You)'));
+				}
+			}
+		}
+	  }
+    }
+  };
 
   QuoteOP = {
     init: function() {
@@ -5068,6 +5108,8 @@
         case 'vp':
         case 'vr':
         case 'wsg':
+        case 'diy':
+        case 'sci':
           url = Redirect.path('//archive.foolz.us', 'foolfuuka', data);
           break;
         case 'u':
@@ -5109,12 +5151,8 @@
         case 'y':
           url = Redirect.path('//archive.foolzashit.com', 'foolfuuka', data);
           break;
-        case 'diy':
-        case 'g':
-        case 'sci':
-          url = Redirect.path('//archive.installgentoo.net', 'fuuka', data);
-          break;
         case 'cgl':
+        case 'g':
         case 'mu':
           url = Redirect.path('//rbt.asia', 'fuuka', data);
           break;
@@ -5720,6 +5758,8 @@
       }
       if (Conf['Indicate OP quote']) {
         QuoteOP.init();
+        //(You) init
+        QuoteYou.init();
       }
       if (Conf['Indicate Cross-thread Quotes']) {
         QuoteCT.init();
@@ -5936,7 +5976,7 @@
       return $.globalEval(("(" + code + ")()").replace('_id_', bq.id));
     },
     namespace: '4chan_x.',
-    version: '2.40.1',
+    version: '2.40.2',
     callbacks: [],
     css: '\
 /* dialog styling */\
