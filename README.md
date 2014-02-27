@@ -11,6 +11,7 @@ This was made to go hand in hand with the [4chan Style Script](https://github.co
 
 2.40.2
 - Add (You) to backlinks to your posts
+- Removed installgentoo archive as it seems to be down (g is  rbt.asia and diy and sci are foolz now)
 
 2.40.1
 - Fixed some mimeTypes error.
