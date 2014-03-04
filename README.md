@@ -1,20 +1,13 @@
-# 4chan x
-My personal fork of 4chan x as ahodesuka does not maintain this any longer.
+# What x
+Immu hack this for wcd, maybe! THanks, I'm not good with computers!?
 
-- WhatIsThisImNotGoodWithComputers
-
-# [Click Here to Install 4chan X](https://github.com/WhatIsThisImNotGoodWithComputers/4chan-x/raw/master/4chan_x.user.js)
-
-This was made to go hand in hand with the [4chan Style Script](https://github.com/WhatIsThisImNotGoodWithComputers/4chan-Style-Script). Make sure to check `Persistent QR`.
+# [Click Here to Install What X](https://github.com/condensedvision/What-x/blob/master/4chan_x.user.js)
 
 # Changelog since I forked it
 
 2.40.2
-- Add (You) to backlinks to your posts
-- Removed installgentoo archive as it seems to be down (g is  rbt.asia and diy and sci are foolz now)
+- Add Title to README.md and repo.
 
-2.40.1
-- Fixed some mimeTypes error.
-
-2.40.0
-- Captcha fix (feb 2014)
+!!!!addendum!!!!!!
+~Don't install this~
+~It doesn't even work~
